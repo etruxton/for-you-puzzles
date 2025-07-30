@@ -2,11 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const gridContainer = document.getElementById('grid-container');
     const wordInput = document.getElementById('word-input');
-    const puzzleSelect = document.getElementById('puzzle-select');
-    const loadPuzzleBtn = document.getElementById('load-puzzle-btn');
-    const randomPuzzleBtn = document.getElementById('random-puzzle-btn');
+    const puzzleTitle = document.getElementById('puzzle-title');
+    const foundCount = document.getElementById('found-count');
+    const totalCount = document.getElementById('total-count');
     const foundWordsList = document.getElementById('found-words-list');
     const bonusWordsList = document.getElementById('bonus-words-list');
+    const celebrationOverlay = document.getElementById('celebration-overlay');
+    const countdownElement = document.getElementById('countdown');
+    const timeRemaining = document.getElementById('time-remaining');
+    const bonusCount = document.getElementById('bonus-count');
+    const summaryOverlay = document.getElementById('summary-overlay');
+    const summaryCountdown = document.getElementById('summary-countdown');
     
     // --- Game State ---
     const gridSize = 10;
@@ -16,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let tileElements = [];
     let originalWords = new Set();
     let allFoundWords = new Set();
+    let foundOriginalWords = new Set();
+    let bonusWordsFound = 0;
+    let bonusWordsArray = [];
+    let currentPuzzleIndex = 0;
+    let previousPuzzleIndex = -1;
+    let autoRandomizeInterval = null;
+    let timerInterval = null;
+    let timeLeft = 120; // 120 seconds
+    let puzzleStartTime = null;
     
     const directions = [
         { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
@@ -29,12 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Network response was not ok.');
             allPuzzles = await response.json();
             
-            populateDropdown();
-            loadPuzzleBtn.disabled = false;
-            randomPuzzleBtn.disabled = false;
+            // Start with a random puzzle
+            loadRandomPuzzle();
             
-            // Load the first puzzle by default
-            generatePuzzleFromData(allPuzzles[0].words);
+            // Set up automatic randomization every 120 seconds
+            autoRandomizeInterval = setInterval(showSummaryScreen, 120000);
+            
+            // Start the countdown timer
+            startTimer();
 
         } catch (error) {
             console.error('Failed to load puzzle data:', error);
@@ -42,13 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function populateDropdown() {
-        allPuzzles.forEach((puzzle, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = puzzle.category;
-            puzzleSelect.appendChild(option);
-        });
+    function loadRandomPuzzle() {
+        previousPuzzleIndex = currentPuzzleIndex;
+        
+        // Ensure we get a different puzzle
+        do {
+            currentPuzzleIndex = Math.floor(Math.random() * allPuzzles.length);
+        } while (currentPuzzleIndex === previousPuzzleIndex && allPuzzles.length > 1);
+        
+        const puzzle = allPuzzles[currentPuzzleIndex];
+        puzzleTitle.textContent = puzzle.category;
+        generatePuzzleFromData(puzzle.words);
+        
+        // Reset timer
+        timeLeft = 120;
+        updateTimerDisplay();
+        puzzleStartTime = Date.now();
     }
 
     // --- Procedural Generation Logic ---
@@ -59,26 +85,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         originalWords = new Set(inputWords);
         allFoundWords.clear();
+        foundOriginalWords.clear();
+        bonusWordsFound = 0;
+        bonusWordsArray = [];
+        updateWordsCounter();
         
-        let grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
-
-        for (const word of inputWords) {
-            let placed = false;
-            const wordToPlace = Math.random() < 0.5 ? word : word.split('').reverse().join('');
+        let grid = null;
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        // Keep trying until we successfully place all words
+        while (attempts < maxAttempts) {
+            grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+            let allWordsPlaced = true;
             
-            for (let i = 0; i < 100; i++) { // Try 100 times
-                const dir = directions[Math.floor(Math.random() * directions.length)];
-                const row = Math.floor(Math.random() * gridSize);
-                const col = Math.floor(Math.random() * gridSize);
+            for (const word of inputWords) {
+                let placed = false;
+                const wordToPlace = Math.random() < 0.5 ? word : word.split('').reverse().join('');
                 
-                if (canPlaceWord(wordToPlace, grid, row, col, dir)) {
-                    placeWord(wordToPlace, grid, row, col, dir);
-                    placed = true;
+                // Try more positions and directions
+                for (let i = 0; i < 200; i++) {
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const row = Math.floor(Math.random() * gridSize);
+                    const col = Math.floor(Math.random() * gridSize);
+                    
+                    if (canPlaceWord(wordToPlace, grid, row, col, dir)) {
+                        placeWord(wordToPlace, grid, row, col, dir);
+                        placed = true;
+                        break;
+                    }
+                }
+                
+                if (!placed) {
+                    allWordsPlaced = false;
                     break;
                 }
             }
+            
+            if (allWordsPlaced) {
+                break; // Success!
+            }
+            
+            attempts++;
+        }
+        
+        // If we couldn't place all words after many attempts, log a warning
+        if (attempts === maxAttempts) {
+            console.warn('Could not place all words after', maxAttempts, 'attempts');
         }
 
+        // Fill empty cells with random letters
         for (let r = 0; r < gridSize; r++) {
             for (let c = 0; c < gridSize; c++) {
                 if (grid[r][c] === null) {
@@ -93,10 +149,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function canPlaceWord(word, grid, row, col, dir) {
+        // First check if word fits in bounds
+        const endRow = row + (word.length - 1) * dir.x;
+        const endCol = col + (word.length - 1) * dir.y;
+        if (endRow < 0 || endRow >= gridSize || endCol < 0 || endCol >= gridSize) return false;
+        if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) return false;
+        
+        // Check each position
         for (let i = 0; i < word.length; i++) {
             const r = row + i * dir.x;
             const c = col + i * dir.y;
-            if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return false;
             if (grid[r][c] !== null && grid[r][c] !== word[i]) return false;
         }
         return true;
@@ -209,23 +271,176 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isWordValid) return;
             
             allFoundWords.add(word);
+            if (originalWords.has(word)) {
+                foundOriginalWords.add(word);
+                checkForCompletion();
+            } else {
+                bonusWordsFound++;
+                bonusWordsArray.push(word);
+            }
+            updateWordsCounter();
             highlightPath(path);
             addWordToCorrectList(word);
             wordInput.value = '';
         }
     }
 
-    // --- Event Listeners ---
-    loadPuzzleBtn.addEventListener('click', () => {
-        const selectedIndex = puzzleSelect.value;
-        generatePuzzleFromData(allPuzzles[selectedIndex].words);
-    });
+    // --- Helper Functions ---
+    function updateWordsCounter() {
+        foundCount.textContent = foundOriginalWords.size;
+        totalCount.textContent = originalWords.size;
+        bonusCount.textContent = bonusWordsFound;
+    }
+    
+    function startTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            updateTimerDisplay();
+            
+            if (timeLeft <= 0) {
+                timeLeft = 120;
+            }
+        }, 1000);
+    }
+    
+    function showSummaryScreen() {
+        // Stop the timers
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+        if (autoRandomizeInterval) {
+            clearInterval(autoRandomizeInterval);
+        }
+        
+        // Populate summary data
+        document.getElementById('summary-found').textContent = foundOriginalWords.size;
+        document.getElementById('summary-total').textContent = originalWords.size;
+        document.getElementById('summary-bonus').textContent = bonusWordsFound;
+        
+        // Show missed words
+        const missedWords = document.getElementById('missed-words');
+        missedWords.innerHTML = '';
+        originalWords.forEach(word => {
+            if (!foundOriginalWords.has(word)) {
+                const span = document.createElement('span');
+                span.className = 'missed';
+                span.textContent = word;
+                missedWords.appendChild(span);
+            }
+        });
+        
+        // Show found words
+        const foundWordsSummary = document.getElementById('found-words-summary');
+        foundWordsSummary.innerHTML = '';
+        foundOriginalWords.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'found';
+            span.textContent = word;
+            foundWordsSummary.appendChild(span);
+        });
+        
+        // Show bonus words
+        const bonusWordsSummary = document.getElementById('bonus-words-summary');
+        bonusWordsSummary.innerHTML = '';
+        bonusWordsArray.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'bonus';
+            span.textContent = word;
+            bonusWordsSummary.appendChild(span);
+        });
+        
+        // Show the overlay
+        summaryOverlay.classList.remove('hidden');
+        
+        // Start countdown
+        let countdown = 10;
+        summaryCountdown.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            summaryCountdown.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                summaryOverlay.classList.add('hidden');
+                loadRandomPuzzle();
+                // Restart the auto-randomize timer
+                autoRandomizeInterval = setInterval(showSummaryScreen, 120000);
+                startTimer();
+            }
+        }, 1000);
+    }
+    
+    function updateTimerDisplay() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timeRemaining.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
 
-    randomPuzzleBtn.addEventListener('click', () => {
-        const randomIndex = Math.floor(Math.random() * allPuzzles.length);
-        puzzleSelect.value = randomIndex; // Sync dropdown
-        generatePuzzleFromData(allPuzzles[randomIndex].words);
-    });
+    function checkForCompletion() {
+        if (foundOriginalWords.size === originalWords.size && originalWords.size > 0) {
+            celebratePuzzleCompletion();
+        }
+    }
+
+    function celebratePuzzleCompletion() {
+        // Stop the main timer
+        if (autoRandomizeInterval) {
+            clearInterval(autoRandomizeInterval);
+        }
+        
+        // Calculate time taken
+        const timeTaken = Date.now() - puzzleStartTime;
+        const minutesTaken = Math.floor(timeTaken / 60000);
+        const secondsTaken = Math.floor((timeTaken % 60000) / 1000);
+        document.getElementById('time-taken').textContent = `${minutesTaken}:${secondsTaken.toString().padStart(2, '0')}`;
+        
+        // Show all found words
+        const celebrationFoundWords = document.getElementById('celebration-found-words');
+        celebrationFoundWords.innerHTML = '';
+        foundOriginalWords.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'found';
+            span.textContent = word;
+            celebrationFoundWords.appendChild(span);
+        });
+        
+        // Show bonus words
+        document.getElementById('celebration-bonus-count').textContent = bonusWordsFound;
+        const celebrationBonusWords = document.getElementById('celebration-bonus-words');
+        celebrationBonusWords.innerHTML = '';
+        bonusWordsArray.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'bonus';
+            span.textContent = word;
+            celebrationBonusWords.appendChild(span);
+        });
+        
+        celebrationOverlay.classList.remove('hidden');
+        
+        let countdown = 10;
+        countdownElement.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                celebrationOverlay.classList.add('hidden');
+                loadRandomPuzzle();
+                // Restart the auto-randomize timer
+                autoRandomizeInterval = setInterval(showSummaryScreen, 120000);
+                startTimer();
+            }
+        }, 1000);
+    }
+
+    // --- Event Listeners ---
 
     wordInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
@@ -234,7 +449,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Initial Kick-off ---
-    loadPuzzleBtn.disabled = true;
-    randomPuzzleBtn.disabled = true;
     setup();
 });
