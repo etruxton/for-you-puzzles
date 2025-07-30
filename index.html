@@ -75,6 +75,15 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="aws-amplify.min.js"></script>
+    <script>
+        // Debug: Check what's available after Amplify loads
+        window.addEventListener('load', function() {
+            console.log('Amplify global:', typeof Amplify);
+            console.log('Window keys with "amplify":', Object.keys(window).filter(k => k.toLowerCase().includes('amplify')));
+            console.log('Window keys with "aws":', Object.keys(window).filter(k => k.toLowerCase().includes('aws')));
+        });
+    </script>
+    <script src="script.js" defer></script>
 </body>
 </html>
