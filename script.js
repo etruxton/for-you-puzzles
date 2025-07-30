@@ -7,28 +7,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalCount = document.getElementById('total-count');
     const foundWordsList = document.getElementById('found-words-list');
     const bonusWordsList = document.getElementById('bonus-words-list');
+    const celebrationOverlay = document.getElementById('celebration-overlay');
+    const countdownElement = document.getElementById('countdown');
+    const timeRemaining = document.getElementById('time-remaining');
     const bonusCount = document.getElementById('bonus-count');
+    const summaryOverlay = document.getElementById('summary-overlay');
+    const summaryCountdown = document.getElementById('summary-countdown');
     
     // --- Game State ---
     const gridSize = 10;
+    const letterPool = "EEEEEEEEAAAAAIIIIIOOOOONNNNNRRRRRTTTTTLLLLSSSSUUUUDDGGGBBCCMMPPFFHHVVWWYYKJXQZ";
+    let gridData = [];
     let tileElements = [];
-    let currentPuzzle = null; // Will hold the entire puzzle state from the backend
-
-    // AWS Amplify v3 exposes as aws_amplify
-    if (typeof aws_amplify === 'undefined') {
-        console.error('AWS Amplify library not found. Please check that it loaded correctly.');
-        console.log('Available globals:', Object.keys(window).filter(k => k.includes('aws') || k.includes('amplify') || k.includes('Amplify')));
-        gridContainer.innerHTML = '<p style="color: red;">Error: AWS Amplify not loaded. Please refresh the page.</p>';
-        return;
-    }
+    let originalWords = new Set();
+    let allFoundWords = new Set();
+    let foundOriginalWords = new Set();
+    let bonusWordsFound = 0;
+    let bonusWordsArray = [];
+    let timerInterval = null;
+    let timeLeft = 120;
+    let puzzleStartTime = null;
     
-    // Extract Amplify from aws_amplify
-    const Amplify = aws_amplify.default || aws_amplify;
+    const directions = [
+        { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+        { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
+    ];
+
+    // =================================================================
+    // NEW: CONFIGURE AWS AMPLIFY 
+    // =================================================================
+    const Amplify = aws_amplify.default;
     
     const amplifyConfig = {
         aws_project_region: 'us-east-1', 
         aws_cognito_identity_pool_id: 'us-east-1:a181b53d-01ef-4749-bc82-dbb6b5ef62c4', 
-        aws_appsync_graphqlEndpoint: 'https://7x2l4jhm3bcqvkuifm3522udfi.appsync-api.us-east-1.amazonaws.com/graphql',
+        aws_appsync_graphqlEndpoint: 'https://gkxxys6qfbdnjih5rxaenjrulm.appsync-api.us-east-1.amazonaws.com/graphql',
         aws_appsync_region: 'us-east-1', 
         aws_appsync_authenticationType: 'AWS_IAM',
         Auth: {
@@ -40,127 +53,163 @@ document.addEventListener('DOMContentLoaded', () => {
     Amplify.configure(amplifyConfig);
     const { API } = Amplify;
 
+    // =================================================================
+    // NEW: GRAPHQL QUERY
+    // =================================================================
     const getPuzzleQuery = /* GraphQL */ `
       query GetPuzzle($puzzleId: ID!) {
         getPuzzle(puzzleId: $puzzleId) {
           puzzleId
           category
           originalWords
-          grid
-          foundWords {
-            word
-            foundBy
-            pfp
-          }
         }
       }
     `;
 
-    const updatePuzzleMutation = /* GraphQL */ `
-      mutation UpdatePuzzle($puzzleId: ID!, $foundWords: [FoundWordInput]) {
-        updatePuzzle(puzzleId: $puzzleId, foundWords: $foundWords) {
-          puzzleId
-          foundWords {
-            word
-          }
-        }
-      }
-    `;
-
-    const onUpdatePuzzleSubscription = /* GraphQL */ `
-      subscription OnUpdatePuzzle($puzzleId: ID!) {
-        onUpdatePuzzle(puzzleId: $puzzleId) {
-          puzzleId
-          category
-          originalWords
-          grid
-          foundWords {
-            word
-            foundBy
-            pfp
-          }
-        }
-      }
-    `;
-
-    // =================================================================
-    // MAIN SETUP FUNCTION
-    // =================================================================
+    // --- Puzzle Loading and Setup ---
     async function setup() {
-        const puzzleIdToLoad = "MUSIC_THEORY"; // You can change this to dynamically load different puzzles
-
+        // CHANGED: This function now loads a single puzzle from AWS.
+        // You can change "IN_THE_KITCHEN" to any puzzle ID in your DynamoDB table.
+        const puzzleIdToLoad = "IN_THE_KITCHEN"; 
+        
         try {
-            // 1. Fetch the initial state of the puzzle
+            // NEW: Fetch puzzle data from AWS AppSync instead of puzzles.json
             const puzzleData = await API.graphql({
                 query: getPuzzleQuery,
                 variables: { puzzleId: puzzleIdToLoad }
             });
-            currentPuzzle = puzzleData.data.getPuzzle;
-            if (currentPuzzle) {
-                renderUIFromPuzzleState(currentPuzzle);
-            }
 
-            // 2. Subscribe to real-time updates for this puzzle
-            API.graphql({
-                query: onUpdatePuzzleSubscription,
-                variables: { puzzleId: puzzleIdToLoad }
-            }).subscribe({
-                next: ({ value }) => {
-                    // When an update is received, update the current state and re-render the UI
-                    currentPuzzle = value.data.onUpdatePuzzle;
-                    if (currentPuzzle) {
-                        renderUIFromPuzzleState(currentPuzzle);
-                    }
-                },
-                error: (error) => console.warn(error)
-            });
+            const currentPuzzle = puzzleData.data.getPuzzle;
+
+            // CORRECTED LINE: Check for 'originalWords' instead of 'words'
+            if (currentPuzzle && currentPuzzle.originalWords) {
+                
+                puzzleTitle.textContent = currentPuzzle.category;
+                
+                // CORRECTED LINE: Pass 'originalWords' to the function
+                generatePuzzleFromData(currentPuzzle.originalWords);
+
+                startTimer();
+                setInterval(showSummaryScreen, 120000); 
+
+            } else {
+                // This error will no longer be triggered
+                throw new Error("Puzzle data came back null or without words from the backend.");
+            }
 
         } catch (error) {
-            console.error("Error setting up puzzle:", error);
-            gridContainer.innerHTML = `<p>Could not load puzzle. Check console for details.</p>`;
+            console.error('Failed to load puzzle data from AWS:', error);
+            gridContainer.textContent = 'Error: Could not load puzzle from AWS.';
         }
-    }
-
-    // --- Renders the entire UI based on the current puzzle state ---
-    function renderUIFromPuzzleState(puzzle) {
-        // Render the grid if it exists
-        if (puzzle.grid) {
-            renderGrid(puzzle.grid);
-        }
-
-        // Update titles and counters
-        puzzleTitle.textContent = puzzle.category || 'Word Search';
-        totalCount.textContent = puzzle.originalWords?.length || 0;
-        
-        // Clear and render word lists
-        foundWordsList.innerHTML = '';
-        bonusWordsList.innerHTML = '';
-
-        const foundOriginal = [];
-        const foundBonus = [];
-
-        puzzle.foundWords?.forEach(foundWord => {
-            if (puzzle.originalWords.includes(foundWord.word)) {
-                foundOriginal.push(foundWord);
-            } else {
-                foundBonus.push(foundWord);
-            }
-        });
-
-        foundCount.textContent = foundOriginal.length;
-        bonusCount.textContent = foundBonus.length;
-
-        foundOriginal.forEach(word => addWordToList(word, foundWordsList));
-        foundBonus.forEach(word => addWordToList(word, bonusWordsList));
     }
     
-    function renderGrid(gridString) {
+    // NOTE: The `loadRandomPuzzle` function is no longer called by `setup`.
+    // You could adapt this later to first query a list of all puzzle IDs 
+    // and then randomly select one to pass to the `getPuzzleQuery`.
+    function loadRandomPuzzle() {
+        // This function would need to be re-wired to work with AWS.
+        // For now, it's not used in the initial setup.
+    }
+
+    // --- Procedural Generation Logic ---
+    function generatePuzzleFromData(words) {
+        const inputWords = words.map(w => w.toUpperCase())
+            .filter(w => w.length > 0 && w.length <= gridSize)
+            .sort((a, b) => b.length - a.length);
+
+        originalWords = new Set(inputWords);
+        allFoundWords.clear();
+        foundOriginalWords.clear();
+        bonusWordsFound = 0;
+        bonusWordsArray = [];
+        updateWordsCounter();
+        
+        let grid = null;
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        while (attempts < maxAttempts) {
+            grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+            let allWordsPlaced = true;
+            
+            for (const word of inputWords) {
+                let placed = false;
+                const wordToPlace = Math.random() < 0.5 ? word : word.split('').reverse().join('');
+                
+                for (let i = 0; i < 200; i++) {
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const row = Math.floor(Math.random() * gridSize);
+                    const col = Math.floor(Math.random() * gridSize);
+                    
+                    if (canPlaceWord(wordToPlace, grid, row, col, dir)) {
+                        placeWord(wordToPlace, grid, row, col, dir);
+                        placed = true;
+                        break;
+                    }
+                }
+                
+                if (!placed) {
+                    allWordsPlaced = false;
+                    break;
+                }
+            }
+            
+            if (allWordsPlaced) {
+                break; // Success!
+            }
+            
+            attempts++;
+        }
+        
+        if (attempts === maxAttempts) {
+            console.warn('Could not place all words after', maxAttempts, 'attempts');
+        }
+
+        for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+                if (grid[r][c] === null) {
+                    grid[r][c] = letterPool[Math.floor(Math.random() * letterPool.length)];
+                }
+            }
+        }
+
+        renderGrid(grid);
+        foundWordsList.innerHTML = '';
+        bonusWordsList.innerHTML = '';
+        puzzleStartTime = Date.now();
+    }
+
+    function canPlaceWord(word, grid, row, col, dir) {
+        const endRow = row + (word.length - 1) * dir.x;
+        const endCol = col + (word.length - 1) * dir.y;
+        if (endRow < 0 || endRow >= gridSize || endCol < 0 || endCol >= gridSize) return false;
+        if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) return false;
+        
+        for (let i = 0; i < word.length; i++) {
+            const r = row + i * dir.x;
+            const c = col + i * dir.y;
+            if (grid[r][c] !== null && grid[r][c] !== word[i]) return false;
+        }
+        return true;
+    }
+
+    function placeWord(word, grid, row, col, dir) {
+        for (let i = 0; i < word.length; i++) {
+            const r = row + i * dir.x;
+            const c = col + i * dir.y;
+            grid[r][c] = word[i];
+        }
+    }
+    
+    // --- Rendering and Game Logic (largely unchanged) ---
+    function renderGrid(newGrid) {
+        gridData = newGrid;
         gridContainer.innerHTML = '';
         tileElements = [];
         for (let r = 0; r < gridSize; r++) {
             const rowElements = [];
             for (let c = 0; c < gridSize; c++) {
-                const letter = gridString[r * gridSize + c];
+                const letter = gridData[r][c];
                 const tile = document.createElement('div');
                 tile.className = 'grid-tile';
                 tile.textContent = letter;
@@ -171,30 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function addWordToList(wordData, listElement) {
-        const li = document.createElement('li');
-        // You can add logic here to display the PFP if you want
-        li.textContent = wordData.word;
-        li.dataset.word = wordData.word;
-        listElement.prepend(li);
-    }
-    
-    // --- Word Finding and Highlighting (Local Logic) ---
     function findWordOnGrid(word) {
-        // This function remains the same as before, searching the local gridData
-        // (For brevity, not including the full function again)
-        const grid2D = [];
-        for (let i = 0; i < gridSize; i++) {
-            grid2D.push(currentPuzzle.grid.substring(i * gridSize, (i + 1) * gridSize).split(''));
-        }
-
         const wordReversed = word.split('').reverse().join('');
         for (let r = 0; r < gridSize; r++) {
             for (let c = 0; c < gridSize; c++) {
-                for (const dir of [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }]) {
-                    let path = checkDirection(word, r, c, dir, grid2D);
+                for (const dir of directions) {
+                    let path = checkDirection(word, r, c, dir);
                     if (path) return path;
-                    path = checkDirection(wordReversed, r, c, dir, grid2D);
+                    path = checkDirection(wordReversed, r, c, dir);
                     if (path) return path;
                 }
             }
@@ -202,19 +235,37 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    function checkDirection(word, r, c, dir, grid2D) {
+    function checkDirection(word, r, c, dir) {
         const path = [];
         for (let k = 0; k < word.length; k++) {
             const newR = r + k * dir.x;
             const newC = c + k * dir.y;
-            if (newR < 0 || newR >= gridSize || newC < 0 || newC >= gridSize || grid2D[newR][newC] !== word[k]) {
+            if (newR < 0 || newR >= gridSize || newC < 0 || newC >= gridSize || gridData[newR][newC] !== word[k]) {
                 return null;
             }
             path.push({ x: newR, y: newC });
         }
         return path;
     }
+    
+    function addWordToCorrectList(word) {
+        const li = document.createElement('li');
+        li.textContent = word;
+        li.dataset.word = word;
+        if (originalWords.has(word)) {
+            foundWordsList.prepend(li);
+        } else {
+            bonusWordsList.prepend(li);
+        }
+    }
 
+    function moveWordToTop(word) {
+        const li = document.querySelector(`li[data-word="${word}"]`);
+        if (li) {
+            li.parentElement.prepend(li);
+        }
+    }
+    
     function highlightPath(path) {
         path.forEach(pos => tileElements[pos.x][pos.y].classList.add('highlighted'));
         setTimeout(() => {
@@ -222,50 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     }
 
-    // --- Main Guess Handling ---
-    async function processGuess(word) {
-        word = word.toUpperCase().trim();
-        if (!currentPuzzle || word.length < 3) return;
-
-        // Check if word is already found
-        const alreadyFound = currentPuzzle.foundWords?.some(fw => fw.word === word);
-        
-        const path = findWordOnGrid(word);
-        if (!path) return;
-
-        if (alreadyFound) {
-            highlightPath(path);
-            wordInput.value = '';
-            return;
-        }
-        
-        // This is a new word, let's validate and update
-        const isWordValid = await isRealWord(word);
-        if (!isWordValid) return;
-
-        // Optimistically highlight the path for immediate feedback
-        highlightPath(path);
-        wordInput.value = '';
-
-        // Construct the new state and send the mutation
-        const newFoundWord = { word, foundBy: "WebAppUser", pfp: "avatar.png" };
-        const updatedFoundWords = [...(currentPuzzle.foundWords || []), newFoundWord];
-
-        try {
-            await API.graphql({
-                query: updatePuzzleMutation,
-                variables: {
-                    puzzleId: currentPuzzle.puzzleId,
-                    foundWords: updatedFoundWords.map(({ __typename, ...rest }) => rest) // Remove __typename if it exists
-                }
-            });
-            // The subscription will handle the UI update
-        } catch (error) {
-            console.error("Error updating puzzle:", error);
-        }
-    }
-
     async function isRealWord(word) {
+        if (word.length < 3) return false;
         try {
             const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             return response.ok;
@@ -274,8 +283,171 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
     }
+    
+    async function processGuess(word) {
+        word = word.toUpperCase().trim();
+        if (word.length < 3) return;
 
-    // --- Event Listener ---
+        const path = findWordOnGrid(word);
+        if (!path) return;
+
+        if (allFoundWords.has(word)) {
+            highlightPath(path);
+            moveWordToTop(word);
+            wordInput.value = '';
+        } else {
+            const isWordValid = await isRealWord(word);
+            if (!isWordValid) return;
+            
+            allFoundWords.add(word);
+            if (originalWords.has(word)) {
+                foundOriginalWords.add(word);
+                checkForCompletion();
+            } else {
+                bonusWordsFound++;
+                bonusWordsArray.push(word);
+            }
+            updateWordsCounter();
+            highlightPath(path);
+            addWordToCorrectList(word);
+            wordInput.value = '';
+        }
+    }
+
+    // --- Helper Functions ---
+    function updateWordsCounter() {
+        foundCount.textContent = foundOriginalWords.size;
+        totalCount.textContent = originalWords.size;
+        bonusCount.textContent = bonusWordsFound;
+    }
+    
+    function startTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            updateTimerDisplay();
+            
+            if (timeLeft <= 0) {
+                timeLeft = 120;
+            }
+        }, 1000);
+    }
+    
+    // ... (The rest of your helper functions: showSummaryScreen, updateTimerDisplay, etc. remain the same)
+
+    function showSummaryScreen() {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        document.getElementById('summary-found').textContent = foundOriginalWords.size;
+        document.getElementById('summary-total').textContent = originalWords.size;
+        document.getElementById('summary-bonus').textContent = bonusWordsFound;
+        
+        const missedWords = document.getElementById('missed-words');
+        missedWords.innerHTML = '';
+        originalWords.forEach(word => {
+            if (!foundOriginalWords.has(word)) {
+                const span = document.createElement('span');
+                span.className = 'missed';
+                span.textContent = word;
+                missedWords.appendChild(span);
+            }
+        });
+        
+        const foundWordsSummary = document.getElementById('found-words-summary');
+        foundWordsSummary.innerHTML = '';
+        foundOriginalWords.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'found';
+            span.textContent = word;
+            foundWordsSummary.appendChild(span);
+        });
+        
+        const bonusWordsSummary = document.getElementById('bonus-words-summary');
+        bonusWordsSummary.innerHTML = '';
+        bonusWordsArray.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'bonus';
+            span.textContent = word;
+            bonusWordsSummary.appendChild(span);
+        });
+        
+        summaryOverlay.classList.remove('hidden');
+        
+        let countdown = 10;
+        summaryCountdown.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            summaryCountdown.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                summaryOverlay.classList.add('hidden');
+                setup(); // Reloads a new puzzle from AWS
+            }
+        }, 1000);
+    }
+    
+    function updateTimerDisplay() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timeRemaining.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function checkForCompletion() {
+        if (foundOriginalWords.size === originalWords.size && originalWords.size > 0) {
+            celebratePuzzleCompletion();
+        }
+    }
+
+    function celebratePuzzleCompletion() {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        const timeTaken = Date.now() - puzzleStartTime;
+        const minutesTaken = Math.floor(timeTaken / 60000);
+        const secondsTaken = Math.floor((timeTaken % 60000) / 1000);
+        document.getElementById('time-taken').textContent = `${minutesTaken}:${secondsTaken.toString().padStart(2, '0')}`;
+        
+        const celebrationFoundWords = document.getElementById('celebration-found-words');
+        celebrationFoundWords.innerHTML = '';
+        foundOriginalWords.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'found';
+            span.textContent = word;
+            celebrationFoundWords.appendChild(span);
+        });
+        
+        document.getElementById('celebration-bonus-count').textContent = bonusWordsFound;
+        const celebrationBonusWords = document.getElementById('celebration-bonus-words');
+        celebrationBonusWords.innerHTML = '';
+        bonusWordsArray.forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'bonus';
+            span.textContent = word;
+            celebrationBonusWords.appendChild(span);
+        });
+        
+        celebrationOverlay.classList.remove('hidden');
+        
+        let countdown = 10;
+        countdownElement.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                celebrationOverlay.classList.add('hidden');
+                setup(); // Reloads a new puzzle from AWS
+            }
+        }, 1000);
+    }
+    
+    // --- Event Listeners ---
     wordInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
             processGuess(wordInput.value);
