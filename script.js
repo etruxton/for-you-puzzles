@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let bonusWordsFound = 0;
     let bonusWordsArray = [];
     let timerInterval = null;
+    let autoRandomizeInterval = null;
     let timeLeft = 120;
     let puzzleStartTime = null;
     
@@ -33,9 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
     ];
 
-    // =================================================================
-    // NEW: CONFIGURE AWS AMPLIFY 
-    // =================================================================
+    // --- AWS Amplify Configuration ---
     const Amplify = aws_amplify.default;
     
     const amplifyConfig = {
@@ -53,9 +52,16 @@ document.addEventListener('DOMContentLoaded', () => {
     Amplify.configure(amplifyConfig);
     const { API } = Amplify;
 
-    // =================================================================
-    // NEW: GRAPHQL QUERY
-    // =================================================================
+    // --- GraphQL Queries ---
+    const listPuzzlesQuery = /* GraphQL */ `
+      query ListPuzzles {
+        listPuzzles {
+          puzzleId
+          category
+        }
+      }
+    `;
+
     const getPuzzleQuery = /* GraphQL */ `
       query GetPuzzle($puzzleId: ID!) {
         getPuzzle(puzzleId: $puzzleId) {
@@ -68,47 +74,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Puzzle Loading and Setup ---
     async function setup() {
-        // CHANGED: This function now loads a single puzzle from AWS.
-        // You can change "IN_THE_KITCHEN" to any puzzle ID in your DynamoDB table.
-        const puzzleIdToLoad = "IN_THE_KITCHEN"; 
-        
+        // Clear existing timers when loading a new puzzle
+        if (timerInterval) clearInterval(timerInterval);
+        if (autoRandomizeInterval) clearInterval(autoRandomizeInterval);
+
         try {
-            // NEW: Fetch puzzle data from AWS AppSync instead of puzzles.json
+            // 1. Fetch the list of all available puzzles
+            console.log("Fetching list of puzzles...");
+            const allPuzzlesData = await API.graphql({ query: listPuzzlesQuery });
+            const puzzlesList = allPuzzlesData.data.listPuzzles;
+
+            if (!puzzlesList || puzzlesList.length === 0) {
+                throw new Error("No puzzles found.");
+            }
+
+            // 2. Randomly select one puzzle from the list
+            const randomPuzzle = puzzlesList[Math.floor(Math.random() * puzzlesList.length)];
+            const puzzleIdToLoad = randomPuzzle.puzzleId;
+            console.log(`Selected puzzle: ${puzzleIdToLoad}`);
+
+            // 3. Fetch the full details for the selected puzzle
             const puzzleData = await API.graphql({
                 query: getPuzzleQuery,
                 variables: { puzzleId: puzzleIdToLoad }
             });
-
             const currentPuzzle = puzzleData.data.getPuzzle;
 
-            // CORRECTED LINE: Check for 'originalWords' instead of 'words'
+            // 4. Generate the puzzle grid and start the game
             if (currentPuzzle && currentPuzzle.originalWords) {
-                
                 puzzleTitle.textContent = currentPuzzle.category;
-                
-                // CORRECTED LINE: Pass 'originalWords' to the function
                 generatePuzzleFromData(currentPuzzle.originalWords);
-
                 startTimer();
-                setInterval(showSummaryScreen, 120000); 
-
+                autoRandomizeInterval = setInterval(showSummaryScreen, 120000); 
             } else {
-                // This error will no longer be triggered
-                throw new Error("Puzzle data came back null or without words from the backend.");
+                throw new Error("Selected puzzle data is incomplete.");
             }
 
         } catch (error) {
-            console.error('Failed to load puzzle data from AWS:', error);
-            gridContainer.textContent = 'Error: Could not load puzzle from AWS.';
+            console.error('Failed to load and generate puzzle:', error);
+            gridContainer.textContent = 'Error: Could not load a puzzle.';
         }
-    }
-    
-    // NOTE: The `loadRandomPuzzle` function is no longer called by `setup`.
-    // You could adapt this later to first query a list of all puzzle IDs 
-    // and then randomly select one to pass to the `getPuzzleQuery`.
-    function loadRandomPuzzle() {
-        // This function would need to be re-wired to work with AWS.
-        // For now, it's not used in the initial setup.
     }
 
     // --- Procedural Generation Logic ---
@@ -201,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- Rendering and Game Logic (largely unchanged) ---
+    // --- Rendering and Game Logic ---
     function renderGrid(newGrid) {
         gridData = newGrid;
         gridContainer.innerHTML = '';
@@ -322,25 +327,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function startTimer() {
-        if (timerInterval) {
-            clearInterval(timerInterval);
-        }
-        
+        timeLeft = 120; // Reset time
+        updateTimerDisplay(); // Display initial time immediately
         timerInterval = setInterval(() => {
             timeLeft--;
             updateTimerDisplay();
             
             if (timeLeft <= 0) {
-                timeLeft = 120;
+                // This will be caught by the showSummaryScreen interval
+                // but as a fallback, clear this timer.
+                clearInterval(timerInterval);
             }
         }, 1000);
     }
     
-    // ... (The rest of your helper functions: showSummaryScreen, updateTimerDisplay, etc. remain the same)
-
     function showSummaryScreen() {
+        // Stop the timers
         if (timerInterval) clearInterval(timerInterval);
+        if (autoRandomizeInterval) clearInterval(autoRandomizeInterval);
         
+        // Populate summary data
         document.getElementById('summary-found').textContent = foundOriginalWords.size;
         document.getElementById('summary-total').textContent = originalWords.size;
         document.getElementById('summary-bonus').textContent = bonusWordsFound;
@@ -386,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
                 summaryOverlay.classList.add('hidden');
-                setup(); // Reloads a new puzzle from AWS
+                setup(); // Reloads a new random puzzle from AWS
             }
         }, 1000);
     }
@@ -405,7 +411,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function celebratePuzzleCompletion() {
         if (timerInterval) clearInterval(timerInterval);
-        
+        if (autoRandomizeInterval) clearInterval(autoRandomizeInterval);
+
         const timeTaken = Date.now() - puzzleStartTime;
         const minutesTaken = Math.floor(timeTaken / 60000);
         const secondsTaken = Math.floor((timeTaken % 60000) / 1000);
@@ -442,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
                 celebrationOverlay.classList.add('hidden');
-                setup(); // Reloads a new puzzle from AWS
+                setup(); // Reloads a new random puzzle from AWS
             }
         }, 1000);
     }
