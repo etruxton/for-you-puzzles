@@ -1,0 +1,39 @@
+name: Deploy S3 Website and Invalidate CloudFront
+
+on:
+  push:
+    branches:
+      - main # Trigger this workflow on pushes to the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # The runner environment
+
+    # Permissions for OIDC (if you're using Option A)
+    permissions:
+      id-token: write # Required for OIDC authentication
+      contents: read  # Required to checkout the repository code
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4 # Action to check out your code
+
+      # Configure AWS credentials
+      - name: Configure AWS Credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Deploy to S3
+        run: |
+          aws s3 sync . s3://${{ secrets.AWS_S3_BUCKET }} --delete
+          # If your static files are in a 'build' or 'dist' folder:
+          # aws s3 sync ./build s3://${{ secrets.AWS_S3_BUCKET }} --delete
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }} # Ensure region is set for aws cli
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }} # Ensure region is set for aws cli
