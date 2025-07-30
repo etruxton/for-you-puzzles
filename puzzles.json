@@ -1,0 +1,26 @@
+[
+  {
+    "category": "Music Theory",
+    "words": [
+      "BEAT", "CHORD", "MUSIC", "NOTES", "PITCH", "RHYME", "RHYTHM", "SCALE", "SOUND", "TEMPO", "VOCALS", "WAVE"
+    ]
+  },
+  {
+    "category": "Computer Hardware",
+    "words": [
+      "KEYBOARD", "MONITOR", "PROCESSOR", "GRAPHICS", "MEMORY", "STORAGE", "SPEAKER", "MOUSE", "POWER", "CABLE"
+    ]
+  },
+  {
+    "category": "In the Kitchen",
+    "words": [
+      "KNIFE", "SPOON", "BLENDER", "SPATULA", "OVEN", "STOVE", "RECIPE", "SPICES", "CABINETS", "PLATE", "FRYING"
+    ]
+  },
+  {
+    "category": "Space Exploration",
+    "words": [
+      "PLANET", "GALAXY", "COMET", "ASTEROID", "ROCKET", "SPACESHIP", "NEBULA", "ORBIT", "UNIVERSE", "ALIEN"
+    ]
+  }
+]
