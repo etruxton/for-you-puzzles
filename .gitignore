@@ -25,3 +25,5 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Note: puzzles.json needs to be in repo for Heroku deployment
