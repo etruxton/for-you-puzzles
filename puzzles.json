@@ -1,26 +1,32 @@
 [
   {
+    "puzzleId": "MUSIC_THEORY",
     "category": "Music Theory",
-    "words": [
-      "BEAT", "CHORD", "MUSIC", "NOTES", "PITCH", "RHYME", "RHYTHM", "SCALE", "SOUND", "TEMPO", "VOCALS", "WAVE"
-    ]
+    "words": ["BEAT", "CHORD", "MUSIC", "NOTES", "PITCH", "RHYME", "RHYTHM", "SCALE", "SOUND", "TEMPO", "VOCALS", "WAVE"]
   },
   {
+    "puzzleId": "ANIMALS",
+    "category": "Animals",
+    "words": ["CAT", "DOG", "BIRD", "FISH", "LION", "BEAR", "WOLF", "DEER", "FROG", "SNAKE", "EAGLE", "SHARK"]
+  },
+  {
+    "puzzleId": "FOOD",
+    "category": "Food & Cooking",
+    "words": ["BREAD", "PASTA", "RICE", "MEAT", "FISH", "EGGS", "MILK", "CHEESE", "FRUIT", "SALAD", "SOUP", "CAKE"]
+  },
+  {
+    "puzzleId": "COMPUTER_HARDWARE",
     "category": "Computer Hardware",
-    "words": [
-      "KEYBOARD", "MONITOR", "PROCESSOR", "GRAPHICS", "MEMORY", "STORAGE", "SPEAKER", "MOUSE", "POWER", "CABLE"
-    ]
+    "words": ["KEYBOARD", "MONITOR", "PROCESSOR", "GRAPHICS", "MEMORY", "STORAGE", "SPEAKER", "MOUSE", "POWER", "CABLE"]
   },
   {
+    "puzzleId": "KITCHEN",
     "category": "In the Kitchen",
-    "words": [
-      "KNIFE", "SPOON", "BLENDER", "SPATULA", "OVEN", "STOVE", "RECIPE", "SPICES", "CABINETS", "PLATE", "FRYING"
-    ]
+    "words": ["KNIFE", "SPOON", "BLENDER", "SPATULA", "OVEN", "STOVE", "RECIPE", "SPICES", "CABINETS", "PLATE", "FRYING"]
   },
   {
+    "puzzleId": "SPACE",
     "category": "Space Exploration",
-    "words": [
-      "PLANET", "GALAXY", "COMET", "ASTEROID", "ROCKET", "SPACESHIP", "NEBULA", "ORBIT", "UNIVERSE", "ALIEN"
-    ]
+    "words": ["PLANET", "GALAXY", "COMET", "ASTEROID", "ROCKET", "SPACESHIP", "NEBULA", "ORBIT", "UNIVERSE", "ALIEN"]
   }
 ]

@@ -75,15 +75,9 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/aws-amplify@latest/dist/aws-amplify.min.js"></script>
-    <script>
-        // Debug: Check what's available after Amplify loads
-        window.addEventListener('load', function() {
-            console.log('Amplify global:', typeof Amplify);
-            console.log('Window keys with "amplify":', Object.keys(window).filter(k => k.toLowerCase().includes('amplify')));
-            console.log('Window keys with "aws":', Object.keys(window).filter(k => k.toLowerCase().includes('aws')));
-        });
-    </script>
-    <script src="script.js?v=2"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Your game script -->
+    <script src="script.js"></script>
 </body>
 </html>
