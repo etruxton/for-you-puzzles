@@ -230,18 +230,58 @@ document.addEventListener('DOMContentLoaded', () => {
         
         socket.on('current_game', (gameData) => {
             console.log('Received current game:', gameData);
-            if (gameData) {
-                loadGameSession(gameData);
+            if (gameData && gameData.status === 'ACTIVE') {
+                // Clear waiting timer if it exists
+                if (waitingTimer) {
+                    clearInterval(waitingTimer);
+                    waitingTimer = null;
+                }
+                
+                // Clear any polling intervals that might be running
+                clearAllPollingIntervals();
+                
+                // Check if we're in the middle of a celebration or summary screen
+                const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
+                const summaryVisible = !summaryOverlay.classList.contains('hidden');
+                
+                if (celebrationVisible || summaryVisible) {
+                    // Store the new game data to load after the countdown
+                    socket._pendingGame = gameData;
+                } else {
+                    // Load immediately if no overlay is showing
+                    loadGameSession(gameData);
+                }
+            } else if (!gameData) {
+                // No active game, show waiting screen
+                showWaitingScreen();
             }
         });
         
         socket.on('game_pending', (data) => {
             console.log('Game pending:', data.message);
-            showWaitingScreen();
+            showWaitingScreen(data.countdown);
+            if (data.category) {
+                puzzleTitle.textContent = `Next: ${data.category}`;
+            }
+        });
+        
+        socket.on('show_results', (data) => {
+            console.log('Showing results screen for new client:', data);
+            if (data.type === 'celebration') {
+                showCelebrationForNewClient(data);
+            } else if (data.type === 'summary') {
+                showSummaryForNewClient(data);
+            }
         });
         
         socket.on('new_game', (gameData) => {
             console.log('New game started:', gameData);
+            
+            // Clear waiting timer if it exists
+            if (waitingTimer) {
+                clearInterval(waitingTimer);
+                waitingTimer = null;
+            }
             
             // Check if we're in the middle of a celebration or summary screen
             const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
@@ -328,9 +368,65 @@ document.addEventListener('DOMContentLoaded', () => {
         startTimer(endTime);
     }
 
-    function showWaitingScreen() {
-        gridContainer.innerHTML = '<p style="text-align: center; color: #bb86fc;">Waiting for next game to start...</p>';
+    let waitingTimer = null;
+    let pollingIntervals = []; // Track all polling intervals
+    
+    function clearAllPollingIntervals() {
+        pollingIntervals.forEach(interval => {
+            if (interval) {
+                clearInterval(interval);
+            }
+        });
+        pollingIntervals = [];
+    }
+    
+    function showWaitingScreen(countdown = null) {
+        // Clear any existing waiting timer
+        if (waitingTimer) {
+            clearInterval(waitingTimer);
+            waitingTimer = null;
+        }
+        
+        if (countdown && countdown > 0) {
+            // Show countdown timer
+            const minutes = Math.floor(countdown / 60);
+            const seconds = countdown % 60;
+            const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            gridContainer.innerHTML = `
+                <div style="text-align: center; color: #bb86fc;">
+                    <p>Waiting for next game to start... try refreshing browser.</p>
+                    <p style="font-size: 24px; font-weight: bold; color: #03dac6; margin-top: 10px;">${timeText}</p>
+                </div>
+            `;
+            
+            // Start countdown timer
+            waitingTimer = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(waitingTimer);
+                    waitingTimer = null;
+                    gridContainer.innerHTML = '<p style="text-align: center; color: #bb86fc;">Game starting...</p>';
+                    // Request current game state in case we missed the new_game event
+                    socket.emit('request_current_game');
+                } else {
+                    const minutes = Math.floor(countdown / 60);
+                    const seconds = countdown % 60;
+                    const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    const timerElement = gridContainer.querySelector('p:nth-child(2)');
+                    if (timerElement) {
+                        timerElement.textContent = timeText;
+                    }
+                }
+            }, 1000);
+        } else {
+            // No countdown, just show waiting message
+            gridContainer.innerHTML = '<p style="text-align: center; color: #bb86fc;">Waiting for next game to start...</p>';
+        }
+        
         puzzleTitle.textContent = 'Loading...';
+        foundWordsList.innerHTML = '';
+        bonusWordsList.innerHTML = '';
     }
 
     // --- Rendering ---
@@ -606,6 +702,15 @@ document.addEventListener('DOMContentLoaded', () => {
             celebrationBonusWords.appendChild(span);
         });
         
+        // Load pending game immediately but disable input
+        if (socket._pendingGame) {
+            loadGameSession(socket._pendingGame);
+            socket._pendingGame = null;
+        }
+        
+        // Disable word input during celebration
+        wordInput.disabled = true;
+        
         celebrationOverlay.classList.remove('hidden');
         
         // FIXED: Always use 10 seconds for early completion
@@ -620,11 +725,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(countdownInterval);
                 celebrationOverlay.classList.add('hidden');
                 
-                // Load pending game if there is one
-                if (socket._pendingGame) {
-                    loadGameSession(socket._pendingGame);
-                    socket._pendingGame = null;
-                }
+                // Re-enable word input
+                wordInput.disabled = false;
+                wordInput.focus();
             }
         }, 1000);
     }
@@ -672,6 +775,15 @@ document.addEventListener('DOMContentLoaded', () => {
             bonusWordsSummary.appendChild(span);
         });
         
+        // Load pending game immediately but disable input
+        if (socket._pendingGame) {
+            loadGameSession(socket._pendingGame);
+            socket._pendingGame = null;
+        }
+        
+        // Disable word input during summary
+        wordInput.disabled = true;
+        
         summaryOverlay.classList.remove('hidden');
         
         // Countdown to next game
@@ -686,11 +798,176 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(countdownInterval);
                 summaryOverlay.classList.add('hidden');
                 
-                // Load pending game if there is one
-                if (socket._pendingGame) {
-                    loadGameSession(socket._pendingGame);
-                    socket._pendingGame = null;
-                }
+                // Re-enable word input
+                wordInput.disabled = false;
+                wordInput.focus();
+            }
+        }, 1000);
+    }
+
+    function showCelebrationForNewClient(data) {
+        // Load the game data first so we can show results
+        if (data.gameData) {
+            currentSession = data.gameData;
+            originalWords = new Set(data.gameData.words);
+            renderGrid(data.gameData.gridData);
+        }
+        
+        // Populate celebration screen with provided data
+        document.getElementById('time-taken').textContent = data.timeTaken || 'N/A';
+        
+        const celebrationFoundWords = document.getElementById('celebration-found-words');
+        celebrationFoundWords.innerHTML = '';
+        if (data.foundWords) {
+            data.foundWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'found';
+                span.textContent = word;
+                celebrationFoundWords.appendChild(span);
+            });
+        }
+        
+        document.getElementById('celebration-bonus-count').textContent = data.bonusCount || 0;
+        const celebrationBonusWords = document.getElementById('celebration-bonus-words');
+        celebrationBonusWords.innerHTML = '';
+        if (data.bonusWords) {
+            data.bonusWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'bonus';
+                span.textContent = word;
+                celebrationBonusWords.appendChild(span);
+            });
+        }
+        
+        // Load pending game and disable input
+        if (data.pendingGame) {
+            loadGameSession(data.pendingGame);
+        }
+        wordInput.disabled = true;
+        
+        celebrationOverlay.classList.remove('hidden');
+        
+        // Start countdown from remaining time
+        let countdown = data.remainingTime || 10;
+        countdownElement.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                celebrationOverlay.classList.add('hidden');
+                wordInput.disabled = false;
+                wordInput.focus();
+                
+                // Request current game state to ensure we get the new game
+                socket.emit('request_current_game');
+                
+                // Set up aggressive polling until we get the new game
+                let pollCount = 0;
+                const pollForGame = setInterval(() => {
+                    console.log('Polling for new game after celebration...');
+                    socket.emit('request_current_game');
+                    pollCount++;
+                    if (pollCount >= 10) { // Stop after 10 attempts (20 seconds)
+                        clearInterval(pollForGame);
+                        const index = pollingIntervals.indexOf(pollForGame);
+                        if (index > -1) pollingIntervals.splice(index, 1);
+                    }
+                }, 2000);
+                pollingIntervals.push(pollForGame);
+            }
+        }, 1000);
+    }
+
+    function showSummaryForNewClient(data) {
+        // Load the game data first
+        if (data.gameData) {
+            currentSession = data.gameData;
+            originalWords = new Set(data.gameData.words);
+            renderGrid(data.gameData.gridData);
+        }
+        
+        // Populate summary screen
+        document.getElementById('summary-found').textContent = data.foundCount || 0;
+        document.getElementById('summary-total').textContent = data.totalCount || 0;
+        document.getElementById('summary-bonus').textContent = data.bonusCount || 0;
+        
+        // Show missed words
+        const missedWords = document.getElementById('missed-words');
+        missedWords.innerHTML = '';
+        if (data.missedWords) {
+            data.missedWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'missed';
+                span.textContent = word;
+                missedWords.appendChild(span);
+            });
+        }
+        
+        // Show found words
+        const foundWordsSummary = document.getElementById('found-words-summary');
+        foundWordsSummary.innerHTML = '';
+        if (data.foundWords) {
+            data.foundWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'found';
+                span.textContent = word;
+                foundWordsSummary.appendChild(span);
+            });
+        }
+        
+        // Show bonus words
+        const bonusWordsSummary = document.getElementById('bonus-words-summary');
+        bonusWordsSummary.innerHTML = '';
+        if (data.bonusWords) {
+            data.bonusWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'bonus';
+                span.textContent = word;
+                bonusWordsSummary.appendChild(span);
+            });
+        }
+        
+        // Load pending game and disable input
+        if (data.pendingGame) {
+            loadGameSession(data.pendingGame);
+        }
+        wordInput.disabled = true;
+        
+        summaryOverlay.classList.remove('hidden');
+        
+        // Start countdown from remaining time
+        let countdown = data.remainingTime || 10;
+        summaryCountdown.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            summaryCountdown.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                summaryOverlay.classList.add('hidden');
+                wordInput.disabled = false;
+                wordInput.focus();
+                
+                // Request current game state to ensure we get the new game
+                socket.emit('request_current_game');
+                
+                // Set up aggressive polling until we get the new game
+                let pollCount = 0;
+                const pollForGame = setInterval(() => {
+                    console.log('Polling for new game after summary...');
+                    socket.emit('request_current_game');
+                    pollCount++;
+                    if (pollCount >= 10) { // Stop after 10 attempts (20 seconds)
+                        clearInterval(pollForGame);
+                        const index = pollingIntervals.indexOf(pollForGame);
+                        if (index > -1) pollingIntervals.splice(index, 1);
+                    }
+                }, 2000);
+                pollingIntervals.push(pollForGame);
             }
         }, 1000);
     }
