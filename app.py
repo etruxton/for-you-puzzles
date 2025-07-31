@@ -61,11 +61,18 @@ class GameSession:
         self.category = puzzle["category"]
         self.words = [w.upper() for w in puzzle["words"]]
         self.grid_data = self.generate_grid()
+        # Don't set start_time yet - will be set when game actually starts
+        self.start_time = None
+        self.end_time = None
+        self.found_words = []
+        self.status = "PENDING"  # New status for games waiting to start
+        self.completion_timer = None  # Timer for early completion
+    
+    def activate(self):
+        """Activate the game session when it's time to start."""
         self.start_time = datetime.now(timezone.utc)
         self.end_time = self.start_time + timedelta(seconds=120)
-        self.found_words = []
         self.status = "ACTIVE"
-        self.completion_timer = None  # Timer for early completion
         
     def generate_id(self):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -199,8 +206,8 @@ class GameSession:
             "category": self.category,
             "words": self.words,
             "gridData": self.grid_data,
-            "startTime": self.start_time.isoformat(),
-            "endTime": self.end_time.isoformat(),
+            "startTime": self.start_time.isoformat() if self.start_time else None,
+            "endTime": self.end_time.isoformat() if self.end_time else None,
             "foundWords": self.found_words,
             "status": self.status
         }
@@ -218,25 +225,40 @@ def start_new_game():
         max_puzzle_attempts = 10
         for attempt in range(max_puzzle_attempts):
             puzzle = random.choice(PUZZLES)
-            current_game = GameSession(puzzle)
+            new_game = GameSession(puzzle)
             
             # Verify all words can be found in the grid
-            if verify_grid(current_game):
-                print(f"Started new game: {current_game.session_id} - {current_game.category}")
-                print(f"All words verified to be findable in the grid")
+            if verify_grid(new_game):
+                current_game = new_game
+                print(f"Created new game: {current_game.session_id} - {current_game.category}")
+                print(f"Game will activate in 10 seconds...")
                 
-                # Emit new game event to all connected clients
-                socketio.emit('new_game', current_game.to_dict(), room='game')
+                # Schedule game activation in 10 seconds
+                activation_timer = threading.Timer(10.0, activate_and_announce_game)
+                activation_timer.daemon = True
+                activation_timer.start()
                 
-                # Schedule the next game
-                game_timer = threading.Timer(120.0, start_new_game)
-                game_timer.daemon = True
-                game_timer.start()
                 return
             else:
                 print(f"Grid verification failed for puzzle {puzzle['category']}, trying another...")
         
         print("ERROR: Could not generate a valid puzzle after multiple attempts!")
+
+def activate_and_announce_game():
+    """Activate the pending game and announce it to all players."""
+    global game_timer
+    with game_lock:
+        if current_game and current_game.status == "PENDING":
+            current_game.activate()
+            print(f"Activated game: {current_game.session_id}")
+            
+            # Emit new game event to all connected clients
+            socketio.emit('new_game', current_game.to_dict(), room='game')
+            
+            # Schedule the next game for 120 seconds from now
+            game_timer = threading.Timer(120.0, start_new_game)
+            game_timer.daemon = True
+            game_timer.start()
 
 def start_early_completion_timer():
     """Start a 10-second timer when puzzle is completed early."""
@@ -351,16 +373,21 @@ def handle_connect():
     join_room('game')
     print(f"Client connected: {request.sid}")
     
-    # Send current game state to the new player
+    # Send current game state to the new player if it's active
     with game_lock:
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
+        elif current_game and current_game.status == "PENDING":
+            # Game is pending, tell client to wait
+            emit('game_pending', {'message': 'New game starting soon...'})
 
 @socketio.on('request_current_game')
 def handle_request_current_game():
     with game_lock:
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
+        elif current_game and current_game.status == "PENDING":
+            emit('game_pending', {'message': 'New game starting soon...'})
         else:
             emit('current_game', None)
 

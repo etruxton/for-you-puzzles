@@ -67,6 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
+        socket.on('game_pending', (data) => {
+            console.log('Game pending:', data.message);
+            showWaitingScreen();
+        });
+        
         socket.on('new_game', (gameData) => {
             console.log('New game started:', gameData);
             
