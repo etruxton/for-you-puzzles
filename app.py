@@ -73,14 +73,16 @@ def check_direction(word, r, c, dx, dy, grid_data):
     return True
 
 def is_real_word(word):
-    """Validate word using dictionary API"""
+    """Validate word using dictionary API with fallback"""
     if len(word) < 3:
         return False
     try:
-        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=5)
+        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=3)
         return response.status_code == 200
-    except:
-        return False
+    except Exception as e:
+        print(f"Dictionary API error for '{word}': {e}")
+        # Fallback: if API fails, allow the word (client already validated it)
+        return True
 
 # Serve static files
 @app.route('/')
@@ -411,25 +413,29 @@ def submit_word():
         if current_game.status != "ACTIVE":
             return jsonify({"error": "Game not active"}), 400
         
-        result = current_game.submit_word(word, player_id)
-        
-        # Emit word found event to all players if successful
-        if result["success"]:
-            # Include the word and who found it in the broadcast
-            emit_data = {
-                "success": True,
-                "word": result["word"],
-                "isBonus": result["isBonus"],
-                "foundWords": result["foundWords"],
-                "foundBy": result["foundBy"]
-            }
-            socketio.emit('word_found', emit_data, room='game')
+        try:
+            result = current_game.submit_word(word, player_id)
             
-            # Check if puzzle is completed
-            if result.get("puzzleCompleted", False):
-                start_early_completion_timer()
-        
-        return jsonify(result)
+            # Emit word found event to all players if successful
+            if result["success"]:
+                # Include the word and who found it in the broadcast
+                emit_data = {
+                    "success": True,
+                    "word": result["word"],
+                    "isBonus": result["isBonus"],
+                    "foundWords": result["foundWords"],
+                    "foundBy": result["foundBy"]
+                }
+                socketio.emit('word_found', emit_data, room='game')
+                
+                # Check if puzzle is completed
+                if result.get("puzzleCompleted", False):
+                    start_early_completion_timer()
+            
+            return jsonify(result)
+        except Exception as e:
+            print(f"Error in submit_word: {e}")
+            return jsonify({"error": "Server error", "success": False}), 500
 
 # WebSocket Events
 @socketio.on('connect')
