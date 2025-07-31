@@ -396,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
             li.appendChild(avatar);
             li.appendChild(wordSpan);
             li.dataset.word = fw.word;
+            li.dataset.foundBy = fw.foundBy; // Store who found it
             
             if (fw.isBonus) {
                 bonusWordsList.appendChild(li);
@@ -437,7 +438,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Check if already found locally
         if (allFoundWords.has(word)) {
-            highlightPath(path, playerId);
+            // Find who originally found this word
+            const foundWordItem = foundWordsList.querySelector(`li[data-word="${word}"]`) || 
+                                 bonusWordsList.querySelector(`li[data-word="${word}"]`);
+            const originalFinder = foundWordItem ? foundWordItem.dataset.foundBy : playerId;
+            
+            highlightPath(path, originalFinder);
             moveWordToTop(word); 	// Move the word to the top
             wordInput.value = '';
             return;
