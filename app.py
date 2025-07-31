@@ -332,15 +332,6 @@ def check_word_at_position(grid, word, row, col, dr, dc):
     return True
 
 # API Routes
-@app.route('/api/current-game', methods=['GET'])
-def get_current_game():
-    with game_lock:
-        if current_game and current_game.status == "ACTIVE":
-            # Check if game has expired
-            if datetime.now() > current_game.end_time:
-                current_game.status = "EXPIRED"
-            return jsonify(current_game.to_dict())
-        return jsonify(None)
 
 @app.route('/api/submit-word', methods=['POST'])
 def submit_word():

@@ -287,20 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Game Setup ---
-    async function setup() {
-        try {
-            const response = await fetch(`${SERVER_URL}/api/current-game`);
-            const gameData = await response.json();
-            
-            if (gameData && gameData.status === 'ACTIVE') {
-                loadGameSession(gameData);
-            } else {
-                showWaitingScreen();
-            }
-        } catch (error) {
-            console.error('Failed to load game:', error);
-            gridContainer.textContent = 'Error: Could not connect to server';
-        }
+    function setup() {
+        // Show waiting screen initially - Socket.IO will handle loading the actual game
+        showWaitingScreen();
     }
 
     function loadGameSession(gameData) {
