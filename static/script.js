@@ -102,6 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (path) {
                         console.log('Highlighting path for other player\'s word');
                         highlightPath(path, true); // true = someone else found it
+                        
+                        // Test: Check if the CSS class is being applied
+                        setTimeout(() => {
+                            const testTile = tileElements[path[0].x][path[0].y];
+                            console.log('Tile classes after highlight:', testTile.className);
+                        }, 100);
                     } else {
                         console.log('Could not find path for word:', data.word);
                     }
@@ -331,16 +337,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function highlightPath(path, isOtherPlayer = false) {
         const highlightClass = isOtherPlayer ? 'highlighted-other' : 'highlighted';
+        console.log(`Highlighting with class: ${highlightClass}, path length: ${path.length}`);
         
         path.forEach(pos => {
             const tile = tileElements[pos.x][pos.y];
+            
+            // Remove any existing highlight classes first
+            tile.classList.remove('highlighted', 'highlighted-other');
+            
+            // Force reflow to reset animation
+            void tile.offsetWidth;
+            
+            console.log(`Adding ${highlightClass} to tile at ${pos.x},${pos.y}`);
             tile.classList.add(highlightClass);
         });
         
         setTimeout(() => {
             path.forEach(pos => {
                 const tile = tileElements[pos.x][pos.y];
-                tile.classList.remove(highlightClass);
+                tile.classList.remove('highlighted', 'highlighted-other');
             });
         }, 1500);
     }
