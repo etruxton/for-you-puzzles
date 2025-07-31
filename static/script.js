@@ -42,6 +42,44 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('playerId', playerId);
     }
 
+    // --- Avatar Generation ---
+    function generateAvatar(playerId) {
+        // Use player ID to generate consistent colors
+        let hash = 0;
+        for (let i = 0; i < playerId.length; i++) {
+            hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Generate colors from hash
+        const hue = Math.abs(hash) % 360;
+        const backgroundColor = `hsl(${hue}, 70%, 80%)`;
+        const hairColor = `hsl(${(hue + 30) % 360}, 50%, 40%)`;
+        
+        // Create SVG avatar
+        const svg = `
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+                <circle cx="12" cy="10" r="6" fill="#FFE4C4"/>
+                <path d="M6 10 Q12 4, 18 10" fill="${hairColor}"/>
+                <circle cx="9" cy="10" r="1" fill="#333"/>
+                <circle cx="15" cy="10" r="1" fill="#333"/>
+                <path d="M9 13 Q12 15, 15 13" fill="none" stroke="#333" stroke-width="0.5"/>
+            </svg>
+        `;
+        
+        return 'data:image/svg+xml;base64,' + btoa(svg);
+    }
+    
+    // Cache for avatars
+    const avatarCache = {};
+    
+    function getAvatar(playerId) {
+        if (!avatarCache[playerId]) {
+            avatarCache[playerId] = generateAvatar(playerId);
+        }
+        return avatarCache[playerId];
+    }
+
     // --- Socket.IO Connection ---
     function connectSocket() {
         // Use relative path for Socket.IO to work on both local and Heroku
@@ -89,27 +127,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         socket.on('word_found', (data) => {
-            console.log('Word found event:', data);
-            console.log('Found by:', data.foundBy, 'My ID:', playerId);
-            
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
                 
                 // Highlight the word on the grid if someone else found it
                 if (data.foundBy && data.foundBy !== playerId && data.word) {
-                    console.log('Someone else found:', data.word);
                     const path = findWordOnGrid(data.word);
                     if (path) {
-                        console.log('Highlighting path for other player\'s word');
                         highlightPath(path, true); // true = someone else found it
-                        
-                        // Test: Check if the CSS class is being applied
-                        setTimeout(() => {
-                            const testTile = tileElements[path[0].x][path[0].y];
-                            console.log('Tile classes after highlight:', testTile.className);
-                        }, 100);
-                    } else {
-                        console.log('Could not find path for word:', data.word);
                     }
                 }
             }
@@ -226,9 +251,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         foundWords.forEach(fw => {
             const li = document.createElement('li');
-            li.textContent = fw.word;
-            li.title = `Found by ${fw.foundBy}`;
-            li.dataset.word = fw.word;  // Add data attribute for easy selection
+            
+            // Create avatar img
+            const avatar = document.createElement('img');
+            avatar.src = getAvatar(fw.foundBy);
+            avatar.className = 'player-avatar';
+            avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
+            
+            // Create word span
+            const wordSpan = document.createElement('span');
+            wordSpan.textContent = fw.word;
+            
+            // Add both to li
+            li.appendChild(avatar);
+            li.appendChild(wordSpan);
+            li.dataset.word = fw.word;
             
             if (fw.isBonus) {
                 bonusWordsList.appendChild(li);
@@ -337,7 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function highlightPath(path, isOtherPlayer = false) {
         const highlightClass = isOtherPlayer ? 'highlighted-other' : 'highlighted';
-        console.log(`Highlighting with class: ${highlightClass}, path length: ${path.length}`);
         
         path.forEach(pos => {
             const tile = tileElements[pos.x][pos.y];
@@ -348,7 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Force reflow to reset animation
             void tile.offsetWidth;
             
-            console.log(`Adding ${highlightClass} to tile at ${pos.x},${pos.y}`);
             tile.classList.add(highlightClass);
         });
         
