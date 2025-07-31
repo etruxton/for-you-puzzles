@@ -356,17 +356,29 @@ def handle_connect():
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
 
+@socketio.on('request_current_game')
+def handle_request_current_game():
+    with game_lock:
+        if current_game and current_game.status == "ACTIVE":
+            emit('current_game', current_game.to_dict())
+        else:
+            emit('current_game', None)
+
 @socketio.on('disconnect')
 def handle_disconnect():
     leave_room('game')
     print(f"Client disconnected: {request.sid}")
 
+# Initialize the server
+print("Initializing For You Puzzles server...")
+
+# Start the first game before running the server
+start_new_game()
+
 if __name__ == '__main__':
-    # Start the first game
-    start_new_game()
-    
     # Get port from environment variable (Heroku) or use 5000 locally
     port = int(os.environ.get('PORT', 5000))
     
     # Run the server
+    print(f"Starting server on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=False)

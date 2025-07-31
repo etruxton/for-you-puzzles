@@ -44,20 +44,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Socket.IO Connection ---
     function connectSocket() {
-        socket = io(SERVER_URL);
+        // Use relative path for Socket.IO to work on both local and Heroku
+        const socketUrl = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000' 
+            : window.location.origin;
+            
+        socket = io(socketUrl, {
+            transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+            upgrade: true
+        });
         
         socket.on('connect', () => {
             console.log('Connected to server');
+            // Request current game state when connected
+            socket.emit('request_current_game');
         });
         
         socket.on('current_game', (gameData) => {
+            console.log('Received current game:', gameData);
             if (gameData) {
                 loadGameSession(gameData);
             }
         });
         
         socket.on('new_game', (gameData) => {
-            console.log('New game started:', gameData.sessionId, gameData.puzzleId);
+            console.log('New game started:', gameData);
             
             // Check if we're in the middle of a celebration or summary screen
             const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
@@ -83,8 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // The celebration screen will show the reduced countdown automatically
         });
         
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error.message);
+            gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Connection error. Please refresh the page.</p>';
+        });
+        
         socket.on('disconnect', () => {
             console.log('Disconnected from server');
+            gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Disconnected. Attempting to reconnect...</p>';
         });
     }
 
