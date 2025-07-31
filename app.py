@@ -360,7 +360,15 @@ def submit_word():
         
         # Emit word found event to all players if successful
         if result["success"]:
-            socketio.emit('word_found', result, room='game')
+            # Include the word and who found it in the broadcast
+            emit_data = {
+                "success": True,
+                "word": result["word"],
+                "isBonus": result["isBonus"],
+                "foundWords": result["foundWords"],
+                "foundBy": result["foundBy"]
+            }
+            socketio.emit('word_found', emit_data, room='game')
             
             # Check if puzzle is completed
             if result.get("puzzleCompleted", False):

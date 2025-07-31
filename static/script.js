@@ -89,14 +89,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         socket.on('word_found', (data) => {
+            console.log('Word found event:', data);
+            console.log('Found by:', data.foundBy, 'My ID:', playerId);
+            
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
                 
                 // Highlight the word on the grid if someone else found it
-                if (data.foundBy && data.foundBy !== playerId) {
+                if (data.foundBy && data.foundBy !== playerId && data.word) {
+                    console.log('Someone else found:', data.word);
                     const path = findWordOnGrid(data.word);
                     if (path) {
+                        console.log('Highlighting path for other player\'s word');
                         highlightPath(path, true); // true = someone else found it
+                    } else {
+                        console.log('Could not find path for word:', data.word);
                     }
                 }
             }
@@ -282,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success || result.alreadyFound) {
-                highlightPath(path);
+                highlightPath(path); // Blue highlight for your own word
                 wordInput.value = '';
             }
         } catch (error) {
