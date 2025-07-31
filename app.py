@@ -264,6 +264,26 @@ class GameSession:
 def start_new_game():
     global current_game, game_timer
     with game_lock:
+        # Set results screen data for summary if game expired due to time
+        if current_game and current_game.status == "ACTIVE":
+            # Game expired due to time limit
+            found_original_words = [fw["word"] for fw in current_game.found_words if not fw["isBonus"]]
+            bonus_words = [fw["word"] for fw in current_game.found_words if fw["isBonus"]]
+            missed_words = [word for word in current_game.words if word not in found_original_words]
+            
+            results_screen_data = {
+                'type': 'summary',
+                'gameData': current_game.to_dict(),
+                'foundWords': found_original_words,
+                'bonusWords': bonus_words,
+                'missedWords': missed_words,
+                'foundCount': len(found_original_words),
+                'totalCount': len(current_game.words),
+                'bonusCount': len(bonus_words),
+                'remainingTime': 10,
+                'pendingGame': None  # Will be set when new game is created
+            }
+        
         # Cancel any existing timers
         if game_timer:
             game_timer.cancel()
@@ -316,6 +336,21 @@ def start_early_completion_timer():
     if current_game and current_game.status == "ACTIVE":
         current_game.status = "COMPLETED"
         print("Puzzle completed! Starting new game in 10 seconds...")
+        
+        # Set results screen data for celebration screen
+        found_original_words = [fw["word"] for fw in current_game.found_words if not fw["isBonus"]]
+        bonus_words = [fw["word"] for fw in current_game.found_words if fw["isBonus"]]
+        
+        results_screen_data = {
+            'type': 'celebration',
+            'gameData': current_game.to_dict(),
+            'foundWords': found_original_words,
+            'bonusWords': bonus_words,
+            'bonusCount': len(bonus_words),
+            'timeTaken': 'N/A',  # Would need to calculate this
+            'remainingTime': 10,
+            'pendingGame': None  # Will be set when new game is created
+        }
         
         # Notify all clients that puzzle was completed
         socketio.emit('puzzle_completed', {
@@ -427,11 +462,18 @@ def handle_connect():
     
     # Send current game state to the new player if it's active
     with game_lock:
-        if current_game and current_game.status == "ACTIVE":
+        if results_screen_data:
+            # Show the active results screen to new client
+            emit('show_results', results_screen_data)
+        elif current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
         elif current_game and current_game.status == "PENDING":
             # Game is pending, tell client to wait
-            emit('game_pending', {'message': 'New game starting soon...'})
+            emit('game_pending', {
+                'message': 'New game starting soon...',
+                'countdown': 10,  # Approximate countdown
+                'category': current_game.category
+            })
 
 @socketio.on('request_current_game')
 def handle_request_current_game():

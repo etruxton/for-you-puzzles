@@ -240,6 +240,15 @@ document.addEventListener('DOMContentLoaded', () => {
             showWaitingScreen();
         });
         
+        socket.on('show_results', (data) => {
+            console.log('Showing results screen for new client:', data);
+            if (data.type === 'celebration') {
+                showCelebrationForNewClient(data);
+            } else if (data.type === 'summary') {
+                showSummaryForNewClient(data);
+            }
+        });
+        
         socket.on('new_game', (gameData) => {
             console.log('New game started:', gameData);
             
@@ -691,6 +700,173 @@ document.addEventListener('DOMContentLoaded', () => {
                     loadGameSession(socket._pendingGame);
                     socket._pendingGame = null;
                 }
+            }
+        }, 1000);
+    }
+
+    function showCelebrationForNewClient(data) {
+        // Load the game data first so we can show results
+        if (data.gameData) {
+            currentSession = data.gameData;
+            originalWords = new Set(data.gameData.words);
+            renderGrid(data.gameData.gridData);
+        }
+        
+        // Populate celebration screen with provided data
+        document.getElementById('time-taken').textContent = data.timeTaken || 'N/A';
+        
+        const celebrationFoundWords = document.getElementById('celebration-found-words');
+        celebrationFoundWords.innerHTML = '';
+        if (data.foundWords) {
+            data.foundWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'found';
+                span.textContent = word;
+                celebrationFoundWords.appendChild(span);
+            });
+        }
+        
+        document.getElementById('celebration-bonus-count').textContent = data.bonusCount || 0;
+        const celebrationBonusWords = document.getElementById('celebration-bonus-words');
+        celebrationBonusWords.innerHTML = '';
+        if (data.bonusWords) {
+            data.bonusWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'bonus';
+                span.textContent = word;
+                celebrationBonusWords.appendChild(span);
+            });
+        }
+        
+        // Load pending game and disable input
+        if (data.pendingGame) {
+            loadGameSession(data.pendingGame);
+        }
+        wordInput.disabled = true;
+        
+        celebrationOverlay.classList.remove('hidden');
+        
+        // Start countdown from remaining time
+        let countdown = data.remainingTime || 10;
+        countdownElement.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                celebrationOverlay.classList.add('hidden');
+                wordInput.disabled = false;
+                wordInput.focus();
+                
+                // Request current game state to ensure we get the new game
+                socket.emit('request_current_game');
+                
+                // Set up aggressive polling until we get the new game
+                let pollCount = 0;
+                const pollForGame = setInterval(() => {
+                    console.log('Polling for new game after celebration...');
+                    socket.emit('request_current_game');
+                    pollCount++;
+                    if (pollCount >= 10) { // Stop after 10 attempts (20 seconds)
+                        clearInterval(pollForGame);
+                        const index = pollingIntervals.indexOf(pollForGame);
+                        if (index > -1) pollingIntervals.splice(index, 1);
+                    }
+                }, 2000);
+                pollingIntervals.push(pollForGame);
+            }
+        }, 1000);
+    }
+
+    function showSummaryForNewClient(data) {
+        // Load the game data first
+        if (data.gameData) {
+            currentSession = data.gameData;
+            originalWords = new Set(data.gameData.words);
+            renderGrid(data.gameData.gridData);
+        }
+        
+        // Populate summary screen
+        document.getElementById('summary-found').textContent = data.foundCount || 0;
+        document.getElementById('summary-total').textContent = data.totalCount || 0;
+        document.getElementById('summary-bonus').textContent = data.bonusCount || 0;
+        
+        // Show missed words
+        const missedWords = document.getElementById('missed-words');
+        missedWords.innerHTML = '';
+        if (data.missedWords) {
+            data.missedWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'missed';
+                span.textContent = word;
+                missedWords.appendChild(span);
+            });
+        }
+        
+        // Show found words
+        const foundWordsSummary = document.getElementById('found-words-summary');
+        foundWordsSummary.innerHTML = '';
+        if (data.foundWords) {
+            data.foundWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'found';
+                span.textContent = word;
+                foundWordsSummary.appendChild(span);
+            });
+        }
+        
+        // Show bonus words
+        const bonusWordsSummary = document.getElementById('bonus-words-summary');
+        bonusWordsSummary.innerHTML = '';
+        if (data.bonusWords) {
+            data.bonusWords.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'bonus';
+                span.textContent = word;
+                bonusWordsSummary.appendChild(span);
+            });
+        }
+        
+        // Load pending game and disable input
+        if (data.pendingGame) {
+            loadGameSession(data.pendingGame);
+        }
+        wordInput.disabled = true;
+        
+        summaryOverlay.classList.remove('hidden');
+        
+        // Start countdown from remaining time
+        let countdown = data.remainingTime || 10;
+        summaryCountdown.textContent = countdown;
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            summaryCountdown.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                summaryOverlay.classList.add('hidden');
+                wordInput.disabled = false;
+                wordInput.focus();
+                
+                // Request current game state to ensure we get the new game
+                socket.emit('request_current_game');
+                
+                // Set up aggressive polling until we get the new game
+                let pollCount = 0;
+                const pollForGame = setInterval(() => {
+                    console.log('Polling for new game after summary...');
+                    socket.emit('request_current_game');
+                    pollCount++;
+                    if (pollCount >= 10) { // Stop after 10 attempts (20 seconds)
+                        clearInterval(pollForGame);
+                        const index = pollingIntervals.indexOf(pollForGame);
+                        if (index > -1) pollingIntervals.splice(index, 1);
+                    }
+                }, 2000);
+                pollingIntervals.push(pollForGame);
             }
         }, 1000);
     }
