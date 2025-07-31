@@ -25,7 +25,6 @@ DIRECTIONS = [
 current_game = None
 game_lock = threading.Lock()
 game_timer = None  # Store the timer so we can cancel it
-results_screen_data = None  # Store results screen info for new clients
 
 # Puzzle database loading
 import json
@@ -195,53 +194,6 @@ class GameSession:
             c = col + i * dc
             grid[r][c] = letter
     
-    def generate_grid_fallback(self):
-        """Fallback method that guarantees word placement by using simpler strategy."""
-        grid = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
-        
-        # Use only horizontal and vertical directions for easier placement
-        simple_directions = [(0, 1), (1, 0)]  # right, down
-        
-        # Sort words by length (longest first)
-        sorted_words = sorted(self.words, key=len, reverse=True)
-        
-        placed_words = []
-        
-        for word in sorted_words:
-            placed = False
-            # Try each simple direction
-            for direction in simple_directions:
-                if placed:
-                    break
-                
-                # Try each position
-                for row in range(GRID_SIZE):
-                    if placed:
-                        break
-                    for col in range(GRID_SIZE):
-                        if self.can_place_word(word, grid, row, col, direction):
-                            self.place_word(word, grid, row, col, direction)
-                            placed_words.append({
-                                'word': word,
-                                'row': row,
-                                'col': col,
-                                'direction': direction
-                            })
-                            placed = True
-                            break
-            
-            if not placed:
-                print(f"Warning: Could not place word '{word}' even with fallback method")
-        
-        # Fill empty cells with random letters
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] is None:
-                    grid[r][c] = random.choice(LETTER_POOL)
-        
-        print(f"Fallback grid generated with {len(placed_words)} words placed")
-        return grid
-    
     def submit_word(self, word, player_id):
         word = word.upper().strip()
         
@@ -316,15 +268,8 @@ class GameSession:
         }
 
 def start_new_game():
-    global current_game, game_timer, results_screen_data
+    global current_game, game_timer
     with game_lock:
-        # Set simple results screen data if game expired due to time
-        if current_game and current_game.status == "ACTIVE":
-            results_screen_data = {
-                'remainingTime': 10,
-                'pendingGame': None  # Will be set when new game is created
-            }
-        
         # Cancel any existing timers
         if game_timer:
             game_timer.cancel()
@@ -343,17 +288,6 @@ def start_new_game():
                 print(f"Created new game: {current_game.session_id} - {current_game.category}")
                 print(f"Game will activate in 10 seconds...")
                 
-                # Update results screen data with pending game info
-                if results_screen_data:
-                    results_screen_data['pendingGame'] = current_game.to_dict()
-                
-                # Emit pending game with countdown info
-                socketio.emit('game_pending', {
-                    'message': 'New game starting soon...',
-                    'countdown': 10,
-                    'category': current_game.category
-                }, room='game')
-                
                 # Schedule game activation in 10 seconds
                 activation_timer = threading.Timer(10.0, activate_and_announce_game)
                 activation_timer.daemon = True
@@ -367,20 +301,14 @@ def start_new_game():
 
 def activate_and_announce_game():
     """Activate the pending game and announce it to all players."""
-    global game_timer, results_screen_data
+    global game_timer
     with game_lock:
         if current_game and current_game.status == "PENDING":
             current_game.activate()
             print(f"Activated game: {current_game.session_id}")
             
-            # Clear results screen data since new game is starting
-            results_screen_data = None
-            
             # Emit new game event to all connected clients
             socketio.emit('new_game', current_game.to_dict(), room='game')
-            
-            # Also emit as current_game to catch any clients that might miss the new_game event
-            socketio.emit('current_game', current_game.to_dict(), room='game')
             
             # Schedule the next game for 120 seconds from now
             game_timer = threading.Timer(120.0, start_new_game)
@@ -389,17 +317,11 @@ def activate_and_announce_game():
 
 def start_early_completion_timer():
     """Start a 10-second timer when puzzle is completed early."""
-    global current_game, results_screen_data
+    global current_game
     
     if current_game and current_game.status == "ACTIVE":
         current_game.status = "COMPLETED"
         print("Puzzle completed! Starting new game in 10 seconds...")
-        
-        # Set simple results screen data to track that we're in results mode
-        results_screen_data = {
-            'remainingTime': 10,
-            'pendingGame': None  # Will be set when new game is created
-        }
         
         # Notify all clients that puzzle was completed
         socketio.emit('puzzle_completed', {
@@ -409,18 +331,6 @@ def start_early_completion_timer():
         # Cancel the existing game timer
         if game_timer:
             game_timer.cancel()
-        
-        # Clear results screen data in 10 seconds when new game should be ready
-        def clear_results_and_notify():
-            global results_screen_data
-            results_screen_data = None
-            # Broadcast current game state to all clients
-            if current_game and current_game.status == "ACTIVE":
-                socketio.emit('current_game', current_game.to_dict(), room='game')
-        
-        results_clear_timer = threading.Timer(10.0, clear_results_and_notify)
-        results_clear_timer.daemon = True
-        results_clear_timer.start()
         
         # Start a new game in 10 seconds
         current_game.completion_timer = threading.Timer(10.0, start_new_game)
@@ -521,24 +431,13 @@ def handle_connect():
     join_room('game')
     print(f"Client connected: {request.sid}")
     
-    # Send current state to the new player
+    # Send current game state to the new player if it's active
     with game_lock:
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
         elif current_game and current_game.status == "PENDING":
             # Game is pending, tell client to wait
-            emit('game_pending', {
-                'message': 'New game starting soon...',
-                'countdown': 10,  # Approximate countdown
-                'category': current_game.category
-            })
-        elif results_screen_data:
-            # During results screen, just show waiting message
-            emit('game_pending', {
-                'message': 'New game starting soon...',
-                'countdown': results_screen_data.get('remainingTime', 10),
-                'category': results_screen_data.get('pendingGame', {}).get('category', 'Loading...')
-            })
+            emit('game_pending', {'message': 'New game starting soon...'})
 
 @socketio.on('request_current_game')
 def handle_request_current_game():
@@ -546,11 +445,7 @@ def handle_request_current_game():
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
         elif current_game and current_game.status == "PENDING":
-            emit('game_pending', {
-                'message': 'New game starting soon...',
-                'countdown': 10,  # Approximate countdown
-                'category': current_game.category
-            })
+            emit('game_pending', {'message': 'New game starting soon...'})
         else:
             emit('current_game', None)
 
@@ -562,36 +457,8 @@ def handle_disconnect():
 # Initialize the server
 print("Initializing For You Puzzles server...")
 
-# Start the first game immediately active
-def start_initial_game():
-    """Start the first game immediately in ACTIVE state"""
-    global current_game, game_timer
-    with game_lock:
-        # Keep trying until we get a valid game
-        max_puzzle_attempts = 10
-        for attempt in range(max_puzzle_attempts):
-            puzzle = random.choice(PUZZLES)
-            new_game = GameSession(puzzle)
-            
-            # Verify all words can be found in the grid
-            if verify_grid(new_game):
-                current_game = new_game
-                current_game.activate()  # Activate immediately
-                print(f"Started initial game: {current_game.session_id} - {current_game.category}")
-                print(f"Game is immediately active and ready to play!")
-                
-                # Schedule the next game for 120 seconds from now
-                game_timer = threading.Timer(120.0, start_new_game)
-                game_timer.daemon = True
-                game_timer.start()
-                
-                return
-            else:
-                print(f"Grid verification failed for puzzle {puzzle['category']}, trying another...")
-        
-        print("ERROR: Could not generate a valid initial puzzle after multiple attempts!")
-
-start_initial_game()
+# Start the first game before running the server
+start_new_game()
 
 if __name__ == '__main__':
     # Get port from environment variable (Heroku) or use 5000 locally
