@@ -50,11 +50,6 @@
     "words": ["OCEAN", "SAND", "WAVES", "SURFING", "SHELL", "CRAB", "TOWEL", "SUNSCREEN", "TIDE", "BEACHBALL", "COAST"]
   },
   {
-    "puzzleId": "MYTHOLOGY",
-    "category": "Mythology",
-    "words": ["GODS", "MYTH", "LEGEND", "DRAGON", "UNICORN", "PHOENIX", "GRIFFIN", "CYCLOPS", "ZEUS", "THOR", "LOKI"]
-  },
-  {
     "puzzleId": "HUMAN_BODY",
     "category": "The Human Body",
     "words": ["HEART", "BRAIN", "LUNGS", "BONES", "MUSCLE", "SPINE", "BLOOD", "STOMACH", "CELLS", "NERVES", "SKIN"]
@@ -127,7 +122,7 @@
   {
     "puzzleId": "VIDEO_GAMES",
     "category": "Video Games",
-    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "GAMER", "PIXEL", "JOYSTICK"]
+    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "PLAYER", "PIXEL", "JOYSTICK"]
   },
   {
     "puzzleId": "IN_THE_GARDEN",
