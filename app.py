@@ -31,10 +31,10 @@ import json
 
 def load_puzzles():
     try:
-        with open('data/puzzles.json', 'r') as f:
+        with open('puzzles.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        print("Warning: data/puzzles.json not found, using default puzzles")
+        print("Warning: puzzles.json not found, using default puzzles")
         return [
             {
                 "puzzleId": "DEFAULT",
@@ -76,12 +76,6 @@ def check_direction(word, r, c, dx, dy, grid_data):
 @app.route('/')
 def serve_index():
     return send_from_directory('static', 'index.html')
-
-# Block access to puzzle data files
-@app.route('/puzzles.json')
-@app.route('/data/<path:filename>')
-def block_puzzle_access(filename=None):
-    return jsonify({"error": "Access denied"}), 403
 
 @app.route('/<path:path>')
 def serve_static(path):
