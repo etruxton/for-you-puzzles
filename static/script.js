@@ -199,6 +199,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return avatarCache[playerId];
     }
 
+    // Extract background color for a player
+    function getPlayerBackgroundColor(playerId) {
+        let hash = 0;
+        for (let i = 0; i < playerId.length; i++) {
+            hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        const hue = Math.abs(hash) % 360;
+        return `hsl(${hue}, 70%, 80%)`;
+    }
+
     // --- Socket.IO Connection ---
     function connectSocket() {
         // Use relative path for Socket.IO to work on both local and Heroku
@@ -253,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.foundBy && data.foundBy !== playerId && data.word) {
                     const path = findWordOnGrid(data.word);
                     if (path) {
-                        highlightPath(path, true); // true = someone else found it
+                        highlightPath(path, data.foundBy); // Pass the player ID who found it
                     }
                 }
             }
@@ -426,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Check if already found locally
         if (allFoundWords.has(word)) {
-            highlightPath(path);
+            highlightPath(path, playerId);
             moveWordToTop(word); 	// Move the word to the top
             wordInput.value = '';
             return;
@@ -451,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success || result.alreadyFound) {
-                highlightPath(path); // Blue highlight for your own word
+                highlightPath(path, playerId); // Highlight with your own color
                 wordInput.value = '';
             }
         } catch (error) {
@@ -491,8 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return path;
     }
 
-    function highlightPath(path, isOtherPlayer = false) {
-        const highlightClass = isOtherPlayer ? 'highlighted-other' : 'highlighted';
+    function highlightPath(path, foundByPlayerId = null) {
+        const isCurrentPlayer = !foundByPlayerId || foundByPlayerId === playerId;
+        const playerColor = isCurrentPlayer ? '#03dac6' : getPlayerBackgroundColor(foundByPlayerId);
         
         path.forEach(pos => {
             const tile = tileElements[pos.x][pos.y];
@@ -503,13 +515,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Force reflow to reset animation
             void tile.offsetWidth;
             
-            tile.classList.add(highlightClass);
+            // Apply custom background color
+            tile.style.backgroundColor = playerColor;
+            tile.style.color = isCurrentPlayer ? '#000000' : '#000000';
+            tile.classList.add('highlighted-custom');
         });
         
         setTimeout(() => {
             path.forEach(pos => {
                 const tile = tileElements[pos.x][pos.y];
-                tile.classList.remove('highlighted', 'highlighted-other');
+                tile.classList.remove('highlighted-custom');
+                tile.style.backgroundColor = '';
+                tile.style.color = '';
             });
         }, 1500);
     }

@@ -299,6 +299,10 @@ h1, h2 {
     animation: flash-red 0.6s ease-in-out;
 }
 
+.highlighted-custom {
+    animation: flash-custom 0.6s ease-in-out;
+}
+
 @keyframes flash-blue {
     0% { 
         transform: scale(1);
@@ -328,6 +332,19 @@ h1, h2 {
     100% { 
         transform: scale(1);
         background-color: #ff6b6b;
+    }
+}
+
+@keyframes flash-custom {
+    0% { 
+        transform: scale(1);
+    }
+    50% { 
+        transform: scale(1.2);
+        box-shadow: 0 0 10px currentColor;
+    }
+    100% { 
+        transform: scale(1);
     }
 }
 
