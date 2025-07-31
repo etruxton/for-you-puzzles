@@ -8,6 +8,7 @@ import threading
 import time
 import json
 import os
+import requests
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -44,6 +45,42 @@ def load_puzzles():
         ]
 
 PUZZLES = load_puzzles()
+
+# Word validation functions
+def find_word_on_grid(word, grid_data):
+    """Check if a word exists on the grid in any direction"""
+    word = word.upper()
+    word_reversed = word[::-1]
+    
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            for dx, dy in DIRECTIONS:
+                if check_direction(word, r, c, dx, dy, grid_data) or \
+                   check_direction(word_reversed, r, c, dx, dy, grid_data):
+                    return True
+    return False
+
+def check_direction(word, r, c, dx, dy, grid_data):
+    """Check if word exists starting at (r,c) in direction (dx,dy)"""
+    for k in range(len(word)):
+        new_r = r + k * dx
+        new_c = c + k * dy
+        
+        if (new_r < 0 or new_r >= GRID_SIZE or 
+            new_c < 0 or new_c >= GRID_SIZE or
+            grid_data[new_r][new_c] != word[k]):
+            return False
+    return True
+
+def is_real_word(word):
+    """Validate word using dictionary API"""
+    if len(word) < 3:
+        return False
+    try:
+        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=5)
+        return response.status_code == 200
+    except:
+        return False
 
 # Serve static files
 @app.route('/')
@@ -162,7 +199,16 @@ class GameSession:
             grid[r][c] = letter
     
     def submit_word(self, word, player_id):
-        word = word.upper()
+        word = word.upper().strip()
+        
+        # Validate word length
+        if len(word) < 3:
+            return {
+                "success": False,
+                "error": "Word too short",
+                "word": word,
+                "foundWords": self.found_words
+            }
         
         # Check if already found
         for found_word in self.found_words:
@@ -175,8 +221,26 @@ class GameSession:
                     "foundWords": self.found_words
                 }
         
+        # SECURITY: Validate word exists on grid
+        if not find_word_on_grid(word, self.grid_data):
+            return {
+                "success": False,
+                "error": "Word not found on grid",
+                "word": word,
+                "foundWords": self.found_words
+            }
+        
         # Check if it's a bonus word
         is_bonus = word not in self.words
+        
+        # SECURITY: Validate bonus words are real words
+        if is_bonus and not is_real_word(word):
+            return {
+                "success": False,
+                "error": "Invalid word",
+                "word": word,
+                "foundWords": self.found_words
+            }
         
         # Add to found words
         self.found_words.append({
@@ -197,7 +261,7 @@ class GameSession:
             "alreadyFound": False,
             "foundWords": self.found_words,
             "puzzleCompleted": puzzle_completed,
-            "foundBy": player_id  # Add who found it
+            "foundBy": player_id
         }
     
     def to_dict(self):
