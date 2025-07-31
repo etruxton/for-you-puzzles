@@ -12,7 +12,7 @@
   {
     "puzzleId": "FOOD",
     "category": "Food",
-    "words": ["BREAD", "PASTA", "RICE", "BURGER", "FISH", "EGGS", "SUSHI", "CHEESE", "AVACADO", "SALAD", "SOUP", "ICECREAM"]
+    "words": ["BREAD", "PASTA", "RICE", "BURGER", "FISH", "EGGS", "SUSHI", "CHEESE", "AVOCADO", "SALAD", "SOUP", "ICECREAM"]
   },
   {
     "puzzleId": "COMPUTER_HARDWARE",
@@ -127,7 +127,7 @@
   {
     "puzzleId": "VIDEO_GAMES",
     "category": "Video Games",
-    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "HIGHSCORE", "PIXEL", "JOYSTICK"]
+    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "GAMER", "PIXEL", "JOYSTICK"]
   },
   {
     "puzzleId": "IN_THE_GARDEN",
