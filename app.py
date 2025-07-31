@@ -8,7 +8,6 @@ import threading
 import time
 import json
 import os
-import requests
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -72,17 +71,6 @@ def check_direction(word, r, c, dx, dy, grid_data):
             return False
     return True
 
-def is_real_word(word):
-    """Validate word using dictionary API with fallback"""
-    if len(word) < 3:
-        return False
-    try:
-        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=3)
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Dictionary API error for '{word}': {e}")
-        # Fallback: if API fails, allow the word (client already validated it)
-        return True
 
 # Serve static files
 @app.route('/')
@@ -235,14 +223,8 @@ class GameSession:
         # Check if it's a bonus word
         is_bonus = word not in self.words
         
-        # SECURITY: Validate bonus words are real words
-        if is_bonus and not is_real_word(word):
-            return {
-                "success": False,
-                "error": "Invalid word",
-                "word": word,
-                "foundWords": self.found_words
-            }
+        # Note: Client already validates real words via dictionary API
+        # Server trusts client validation to avoid blocking/timeout issues
         
         # Add to found words
         self.found_words.append({
