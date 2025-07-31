@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
 import time
 import json
@@ -61,7 +61,7 @@ class GameSession:
         self.category = puzzle["category"]
         self.words = [w.upper() for w in puzzle["words"]]
         self.grid_data = self.generate_grid()
-        self.start_time = datetime.now()
+        self.start_time = datetime.now(timezone.utc)
         self.end_time = self.start_time + timedelta(seconds=120)
         self.found_words = []
         self.status = "ACTIVE"
@@ -175,7 +175,7 @@ class GameSession:
         self.found_words.append({
             "word": word,
             "foundBy": player_id,
-            "foundAt": datetime.now().isoformat(),
+            "foundAt": datetime.now(timezone.utc).isoformat(),
             "isBonus": is_bonus
         })
         

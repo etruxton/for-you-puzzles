@@ -152,8 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateWordsCounter();
         displayFoundWords(gameData.foundWords || []);
         
-        // Start timer
-        startTimer(new Date(gameData.endTime));
+        // Start timer with proper date parsing
+        const endTime = new Date(gameData.endTime);
+        console.log('Game ends at:', endTime.toLocaleString());
+        startTimer(endTime);
     }
 
     function showWaitingScreen() {
@@ -331,14 +333,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const updateTimer = () => {
             const now = new Date();
-            const timeLeft = Math.max(0, Math.floor((endTime - now) / 1000));
+            const end = new Date(endTime);
+            const timeLeft = Math.max(0, Math.floor((end - now) / 1000));
             
             const minutes = Math.floor(timeLeft / 60);
             const seconds = timeLeft % 60;
             timeRemaining.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             
-            if (timeLeft <= 0) {
+            if (timeLeft <= 0 && currentSession && currentSession.status === 'ACTIVE') {
                 clearInterval(timerInterval);
+                currentSession.status = 'EXPIRED'; // Prevent multiple triggers
                 showSummaryScreen();
             }
         };
