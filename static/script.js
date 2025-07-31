@@ -503,8 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function highlightPath(path, foundByPlayerId = null) {
-        const isCurrentPlayer = !foundByPlayerId || foundByPlayerId === playerId;
-        const playerColor = isCurrentPlayer ? '#03dac6' : getPlayerBackgroundColor(foundByPlayerId);
+        const actualPlayerId = foundByPlayerId || playerId;
+        const playerColor = getPlayerBackgroundColor(actualPlayerId);
         
         path.forEach(pos => {
             const tile = tileElements[pos.x][pos.y];
@@ -517,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Apply custom background color
             tile.style.backgroundColor = playerColor;
-            tile.style.color = isCurrentPlayer ? '#000000' : '#000000';
+            tile.style.color = '#000000';
             tile.classList.add('highlighted-custom');
         });
         
