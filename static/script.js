@@ -91,6 +91,14 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('word_found', (data) => {
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
+                
+                // Highlight the word on the grid if someone else found it
+                if (data.foundBy && data.foundBy !== playerId) {
+                    const path = findWordOnGrid(data.word);
+                    if (path) {
+                        highlightPath(path, true); // true = someone else found it
+                    }
+                }
             }
         });
         
@@ -314,10 +322,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return path;
     }
 
-    function highlightPath(path) {
-        path.forEach(pos => tileElements[pos.x][pos.y].classList.add('highlighted'));
+    function highlightPath(path, isOtherPlayer = false) {
+        const highlightClass = isOtherPlayer ? 'highlighted-other' : 'highlighted';
+        
+        path.forEach(pos => {
+            const tile = tileElements[pos.x][pos.y];
+            tile.classList.add(highlightClass);
+        });
+        
         setTimeout(() => {
-            path.forEach(pos => tileElements[pos.x][pos.y].classList.remove('highlighted'));
+            path.forEach(pos => {
+                const tile = tileElements[pos.x][pos.y];
+                tile.classList.remove(highlightClass);
+            });
         }, 1500);
     }
 

@@ -196,7 +196,8 @@ class GameSession:
             "isBonus": is_bonus,
             "alreadyFound": False,
             "foundWords": self.found_words,
-            "puzzleCompleted": puzzle_completed
+            "puzzleCompleted": puzzle_completed,
+            "foundBy": player_id  # Add who found it
         }
     
     def to_dict(self):
