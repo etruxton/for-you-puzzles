@@ -209,7 +209,15 @@ class GameSession:
             "status": self.status
         }
 
-def start_new_game():
+def start_new_game(delay_seconds=0):
+    """Start a new game, optionally after a delay."""
+    if delay_seconds > 0:
+        # Schedule the game start after delay
+        timer = threading.Timer(delay_seconds, lambda: start_new_game(0))
+        timer.daemon = True
+        timer.start()
+        return
+    
     global current_game, game_timer
     with game_lock:
         # Cancel any existing timers
@@ -265,8 +273,18 @@ def start_new_game():
                     
                     threading.Timer(0.1, broadcast_new_game).start()
                     
-                    # Schedule the next game
-                    game_timer = threading.Timer(120.0, start_new_game)
+                    # Schedule the next game with 10 second delay for results screen
+                    def handle_timeout():
+                        with game_lock:
+                            if current_game and current_game.status == "ACTIVE":
+                                current_game.status = "EXPIRED"
+                                # Notify clients that the game has timed out
+                                socketio.emit('game_timeout', {
+                                    'message': 'Time\'s up! New game starting in 10 seconds...'
+                                }, room='game')
+                        start_new_game(10)
+                    
+                    game_timer = threading.Timer(120.0, handle_timeout)
                     game_timer.daemon = True
                     game_timer.start()
                     return

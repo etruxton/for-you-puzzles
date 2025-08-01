@@ -274,6 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // The celebration screen will show the reduced countdown automatically
         });
         
+        socket.on('game_timeout', (data) => {
+            console.log('Game timed out:', data.message);
+            // Show the summary screen when game times out
+            if (currentSession && currentSession.status === 'ACTIVE') {
+                currentSession.status = 'EXPIRED';
+                showSummaryScreen();
+            }
+        });
+        
         // Listen for any socket event for debugging
         socket.onAny((eventName, ...args) => {
             console.log(`[DEBUG] Received event: ${eventName}`, args);
@@ -558,8 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (timeLeft <= 0 && currentSession && currentSession.status === 'ACTIVE') {
                 clearInterval(timerInterval);
-                currentSession.status = 'EXPIRED'; // Prevent multiple triggers
-                showSummaryScreen();
+                // Server will handle the timeout and emit 'game_timeout' event
             }
         };
         
