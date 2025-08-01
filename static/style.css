@@ -284,68 +284,12 @@ h1, h2 {
     background-color: #333333;
     border-radius: 3px;
     text-transform: uppercase;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s;
 }
 
 .highlighted {
     background-color: #03dac6;
     color: #000000;
-    animation: flash-blue 0.6s ease-in-out;
-}
-
-.highlighted-other {
-    background-color: #ff6b6b;
-    color: #ffffff;
-    animation: flash-red 0.6s ease-in-out;
-}
-
-.highlighted-custom {
-    animation: flash-custom 0.6s ease-in-out;
-}
-
-@keyframes flash-blue {
-    0% { 
-        transform: scale(1);
-        background-color: #333333;
-    }
-    50% { 
-        transform: scale(1.2);
-        background-color: #03dac6;
-        box-shadow: 0 0 10px #03dac6;
-    }
-    100% { 
-        transform: scale(1);
-        background-color: #03dac6;
-    }
-}
-
-@keyframes flash-red {
-    0% { 
-        transform: scale(1);
-        background-color: #333333;
-    }
-    50% { 
-        transform: scale(1.2);
-        background-color: #ff6b6b;
-        box-shadow: 0 0 10px #ff6b6b;
-    }
-    100% { 
-        transform: scale(1);
-        background-color: #ff6b6b;
-    }
-}
-
-@keyframes flash-custom {
-    0% { 
-        transform: scale(1);
-    }
-    50% { 
-        transform: scale(1.2);
-        box-shadow: 0 0 10px currentColor;
-    }
-    100% { 
-        transform: scale(1);
-    }
 }
 
 #word-input {
@@ -396,19 +340,8 @@ h1, h2 {
     margin-bottom: 5px;
     padding: 8px;
     border-radius: 3px;
+    text-align: center;
     font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.player-avatar {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid #555;
-    flex-shrink: 0;
 }
 
 /* --- Custom Scrollbar Styling --- */

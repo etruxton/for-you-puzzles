@@ -11,7 +11,11 @@ import os
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, 
+                   cors_allowed_origins="*",
+                   ping_timeout=120,  # 2 minutes before considering client disconnected
+                   ping_interval=25,  # Send ping every 25 seconds
+                   async_mode='threading')
 
 # Grid generation constants
 GRID_SIZE = 10
@@ -45,33 +49,6 @@ def load_puzzles():
 
 PUZZLES = load_puzzles()
 
-# Word validation functions
-def find_word_on_grid(word, grid_data):
-    """Check if a word exists on the grid in any direction"""
-    word = word.upper()
-    word_reversed = word[::-1]
-    
-    for r in range(GRID_SIZE):
-        for c in range(GRID_SIZE):
-            for dx, dy in DIRECTIONS:
-                if check_direction(word, r, c, dx, dy, grid_data) or \
-                   check_direction(word_reversed, r, c, dx, dy, grid_data):
-                    return True
-    return False
-
-def check_direction(word, r, c, dx, dy, grid_data):
-    """Check if word exists starting at (r,c) in direction (dx,dy)"""
-    for k in range(len(word)):
-        new_r = r + k * dx
-        new_c = c + k * dy
-        
-        if (new_r < 0 or new_r >= GRID_SIZE or 
-            new_c < 0 or new_c >= GRID_SIZE or
-            grid_data[new_r][new_c] != word[k]):
-            return False
-    return True
-
-
 # Serve static files
 @app.route('/')
 def serve_index():
@@ -88,18 +65,11 @@ class GameSession:
         self.category = puzzle["category"]
         self.words = [w.upper() for w in puzzle["words"]]
         self.grid_data = self.generate_grid()
-        # Don't set start_time yet - will be set when game actually starts
-        self.start_time = None
-        self.end_time = None
-        self.found_words = []
-        self.status = "PENDING"  # New status for games waiting to start
-        self.completion_timer = None  # Timer for early completion
-    
-    def activate(self):
-        """Activate the game session when it's time to start."""
         self.start_time = datetime.now(timezone.utc)
         self.end_time = self.start_time + timedelta(seconds=120)
+        self.found_words = []
         self.status = "ACTIVE"
+        self.completion_timer = None  # Timer for early completion
         
     def generate_id(self):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -158,10 +128,9 @@ class GameSession:
                 print(f"Placed words: {[pw['word'] for pw in placed_words]}")
                 return grid
         
-        # If we couldn't generate a valid grid after max_attempts, 
-        # use a fallback approach with guaranteed placement
-        print(f"Warning: Could not generate optimal grid after {max_attempts} attempts. Using fallback method.")
-        return self.generate_grid_fallback()
+        # If we couldn't generate a valid grid after max_attempts, return None
+        print(f"ERROR: Could not generate valid grid after {max_attempts} attempts for puzzle {self.puzzle_id}")
+        return None
     
     def can_place_word(self, word, grid, row, col, direction):
         dr, dc = direction
@@ -189,16 +158,7 @@ class GameSession:
             grid[r][c] = letter
     
     def submit_word(self, word, player_id):
-        word = word.upper().strip()
-        
-        # Validate word length
-        if len(word) < 3:
-            return {
-                "success": False,
-                "error": "Word too short",
-                "word": word,
-                "foundWords": self.found_words
-            }
+        word = word.upper()
         
         # Check if already found
         for found_word in self.found_words:
@@ -211,20 +171,8 @@ class GameSession:
                     "foundWords": self.found_words
                 }
         
-        # SECURITY: Validate word exists on grid
-        if not find_word_on_grid(word, self.grid_data):
-            return {
-                "success": False,
-                "error": "Word not found on grid",
-                "word": word,
-                "foundWords": self.found_words
-            }
-        
         # Check if it's a bonus word
         is_bonus = word not in self.words
-        
-        # Note: Client already validates real words via dictionary API
-        # Server trusts client validation to avoid blocking/timeout issues
         
         # Add to found words
         self.found_words.append({
@@ -244,8 +192,7 @@ class GameSession:
             "isBonus": is_bonus,
             "alreadyFound": False,
             "foundWords": self.found_words,
-            "puzzleCompleted": puzzle_completed,
-            "foundBy": player_id
+            "puzzleCompleted": puzzle_completed
         }
     
     def to_dict(self):
@@ -255,8 +202,8 @@ class GameSession:
             "category": self.category,
             "words": self.words,
             "gridData": self.grid_data,
-            "startTime": self.start_time.isoformat() if self.start_time else None,
-            "endTime": self.end_time.isoformat() if self.end_time else None,
+            "startTime": self.start_time.isoformat(),
+            "endTime": self.end_time.isoformat(),
             "foundWords": self.found_words,
             "status": self.status
         }
@@ -271,47 +218,74 @@ def start_new_game():
             current_game.completion_timer.cancel()
         
         # Keep trying until we get a valid game
-        max_puzzle_attempts = 10
-        for attempt in range(max_puzzle_attempts):
-            puzzle = random.choice(PUZZLES)
-            new_game = GameSession(puzzle)
-            
-            # Verify all words can be found in the grid
-            if verify_grid(new_game):
-                current_game = new_game
-                print(f"Created new game: {current_game.session_id} - {current_game.category}")
-                print(f"Game will activate in 10 seconds...")
-                
-                # Schedule game activation in 10 seconds
-                activation_timer = threading.Timer(10.0, activate_and_announce_game)
-                activation_timer.daemon = True
-                activation_timer.start()
-                
-                return
-            else:
-                print(f"Grid verification failed for puzzle {puzzle['category']}, trying another...")
+        max_puzzle_attempts = len(PUZZLES) * 2  # Try each puzzle at least twice
+        used_puzzle_ids = set()
         
-        print("ERROR: Could not generate a valid puzzle after multiple attempts!")
-
-def activate_and_announce_game():
-    """Activate the pending game and announce it to all players."""
-    global game_timer
-    with game_lock:
-        if current_game and current_game.status == "PENDING":
-            current_game.activate()
-            print(f"Activated game: {current_game.session_id}")
+        for attempt in range(max_puzzle_attempts):
+            # Try to find a puzzle we haven't used in this round
+            available_puzzles = [p for p in PUZZLES if p["puzzleId"] not in used_puzzle_ids]
+            if not available_puzzles:
+                # Reset if we've tried all puzzles
+                used_puzzle_ids.clear()
+                available_puzzles = PUZZLES
             
-            # Emit new game event to all connected clients
-            socketio.emit('new_game', current_game.to_dict(), room='game')
+            puzzle = random.choice(available_puzzles)
+            used_puzzle_ids.add(puzzle["puzzleId"])
             
-            # Schedule the next game for 120 seconds from now
-            game_timer = threading.Timer(120.0, start_new_game)
-            game_timer.daemon = True
-            game_timer.start()
+            print(f"[DEBUG] Attempt {attempt + 1}: Trying puzzle {puzzle['puzzleId']} - {puzzle['category']}")
+            
+            try:
+                current_game = GameSession(puzzle)
+                
+                # Verify all words can be found in the grid
+                if current_game.grid_data and verify_grid(current_game):
+                    print(f"Started new game: {current_game.session_id} - {current_game.category}")
+                    print(f"All words verified to be findable in the grid")
+                    
+                    # Emit new game event to all connected clients
+                    print(f"Broadcasting new game to all clients in 'game' room")
+                    game_dict = current_game.to_dict()
+                    print(f"[DEBUG] New game data: {game_dict['sessionId']}, status: {game_dict['status']}")
+                    
+                    # Small delay to ensure game state is settled
+                    def broadcast_new_game():
+                        print("[DEBUG] Broadcasting new game now")
+                        # Get all connected clients
+                        try:
+                            room_clients = socketio.server.manager.rooms.get('/', {}).get('game', [])
+                            print(f"[DEBUG] Connected clients in 'game' room: {len(room_clients)}")
+                        except Exception as e:
+                            print(f"[DEBUG] Error getting room info: {e}")
+                        
+                        socketio.emit('new_game', game_dict, room='game')
+                        # Also emit without room to reach all clients
+                        socketio.emit('new_game', game_dict)
+                        print("[DEBUG] Broadcast complete")
+                    
+                    threading.Timer(0.1, broadcast_new_game).start()
+                    
+                    # Schedule the next game
+                    game_timer = threading.Timer(120.0, start_new_game)
+                    game_timer.daemon = True
+                    game_timer.start()
+                    return
+                else:
+                    print(f"Grid verification failed for puzzle {puzzle['puzzleId']} - {puzzle['category']}")
+            except Exception as e:
+                print(f"Error generating game for puzzle {puzzle['puzzleId']}: {str(e)}")
+                continue
+        
+        # If we get here, we couldn't generate any valid puzzle
+        print("ERROR: Could not generate a valid puzzle after trying all puzzles!")
+        # Try again in 5 seconds
+        print("Retrying in 5 seconds...")
+        threading.Timer(5.0, start_new_game).start()
 
 def start_early_completion_timer():
     """Start a 10-second timer when puzzle is completed early."""
     global current_game
+    
+    print(f"[DEBUG] start_early_completion_timer called. Current game status: {current_game.status if current_game else 'None'}")
     
     if current_game and current_game.status == "ACTIVE":
         current_game.status = "COMPLETED"
@@ -380,6 +354,20 @@ def check_word_at_position(grid, word, row, col, dr, dc):
     return True
 
 # API Routes
+@app.route('/api/current-game', methods=['GET'])
+def get_current_game():
+    with game_lock:
+        if current_game:
+            if current_game.status == "ACTIVE":
+                # Check if game has expired
+                if datetime.now(timezone.utc) > current_game.end_time:
+                    current_game.status = "EXPIRED"
+                    return jsonify(None)  # Return None to trigger frontend to wait
+                return jsonify(current_game.to_dict())
+            elif current_game.status == "COMPLETED":
+                # Game is completed, frontend should wait for new game
+                return jsonify(None)
+        return jsonify(None)
 
 @app.route('/api/submit-word', methods=['POST'])
 def submit_word():
@@ -395,51 +383,45 @@ def submit_word():
         if current_game.status != "ACTIVE":
             return jsonify({"error": "Game not active"}), 400
         
-        try:
-            result = current_game.submit_word(word, player_id)
+        result = current_game.submit_word(word, player_id)
+        
+        # Emit word found event to all players if successful
+        if result["success"]:
+            socketio.emit('word_found', result, room='game')
             
-            # Emit word found event to all players if successful
-            if result["success"]:
-                # Include the word and who found it in the broadcast
-                emit_data = {
-                    "success": True,
-                    "word": result["word"],
-                    "isBonus": result["isBonus"],
-                    "foundWords": result["foundWords"],
-                    "foundBy": result["foundBy"]
-                }
-                socketio.emit('word_found', emit_data, room='game')
-                
-                # Check if puzzle is completed
-                if result.get("puzzleCompleted", False):
-                    start_early_completion_timer()
-            
-            return jsonify(result)
-        except Exception as e:
-            print(f"Error in submit_word: {e}")
-            return jsonify({"error": "Server error", "success": False}), 500
+            # Check if puzzle is completed
+            if result.get("puzzleCompleted", False):
+                start_early_completion_timer()
+        
+        return jsonify(result)
 
 # WebSocket Events
 @socketio.on('connect')
 def handle_connect():
     join_room('game')
     print(f"Client connected: {request.sid}")
+    print(f"Total clients in 'game' room: {len(socketio.server.manager.rooms.get('/', {}).get('game', []))}")
     
-    # Send current game state to the new player if it's active
+    # Send current game state immediately on connect
     with game_lock:
         if current_game and current_game.status == "ACTIVE":
             emit('current_game', current_game.to_dict())
-        elif current_game and current_game.status == "PENDING":
-            # Game is pending, tell client to wait
-            emit('game_pending', {'message': 'New game starting soon...'})
+    
+    # Send current game state to the new player
+    with game_lock:
+        if current_game and current_game.status == "ACTIVE":
+            emit('current_game', current_game.to_dict())
 
 @socketio.on('request_current_game')
 def handle_request_current_game():
     with game_lock:
         if current_game and current_game.status == "ACTIVE":
-            emit('current_game', current_game.to_dict())
-        elif current_game and current_game.status == "PENDING":
-            emit('game_pending', {'message': 'New game starting soon...'})
+            # Check if game has expired
+            if datetime.now(timezone.utc) > current_game.end_time:
+                current_game.status = "EXPIRED"
+                emit('current_game', None)
+            else:
+                emit('current_game', current_game.to_dict())
         else:
             emit('current_game', None)
 
