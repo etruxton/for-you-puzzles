@@ -192,7 +192,8 @@ class GameSession:
             "isBonus": is_bonus,
             "alreadyFound": False,
             "foundWords": self.found_words,
-            "puzzleCompleted": puzzle_completed
+            "puzzleCompleted": puzzle_completed,
+            "foundBy": player_id
         }
     
     def to_dict(self):
@@ -387,7 +388,15 @@ def submit_word():
         
         # Emit word found event to all players if successful
         if result["success"]:
-            socketio.emit('word_found', result, room='game')
+            # Include the word and who found it in the broadcast
+            emit_data = {
+                "success": True,
+                "word": result["word"],
+                "isBonus": result["isBonus"],
+                "foundWords": result["foundWords"],
+                "foundBy": result["foundBy"]
+            }
+            socketio.emit('word_found', emit_data, room='game')
             
             # Check if puzzle is completed
             if result.get("puzzleCompleted", False):
@@ -442,4 +451,5 @@ if __name__ == '__main__':
     
     # Run the server
     print(f"Starting server on port {port}")
-    socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    # For production, use allow_unsafe_werkzeug=True or let Gunicorn handle it
+    socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)

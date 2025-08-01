@@ -284,12 +284,51 @@ h1, h2 {
     background-color: #333333;
     border-radius: 3px;
     text-transform: uppercase;
-    transition: background-color 0.3s;
+    transition: all 0.3s ease;
 }
 
 .highlighted {
     background-color: #03dac6;
     color: #000000;
+    animation: flash-blue 0.6s ease-in-out;
+}
+
+.highlighted-other {
+    background-color: #ff6b6b;
+    color: #ffffff;
+    animation: flash-red 0.6s ease-in-out;
+}
+
+@keyframes flash-blue {
+    0% { 
+        transform: scale(1);
+        background-color: #333333;
+    }
+    50% { 
+        transform: scale(1.2);
+        background-color: #03dac6;
+        box-shadow: 0 0 10px #03dac6;
+    }
+    100% { 
+        transform: scale(1);
+        background-color: #03dac6;
+    }
+}
+
+@keyframes flash-red {
+    0% { 
+        transform: scale(1);
+        background-color: #333333;
+    }
+    50% { 
+        transform: scale(1.2);
+        background-color: #ff6b6b;
+        box-shadow: 0 0 10px #ff6b6b;
+    }
+    100% { 
+        transform: scale(1);
+        background-color: #ff6b6b;
+    }
 }
 
 #word-input {
