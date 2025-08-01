@@ -157,8 +157,46 @@ class GameSession:
             c = col + i * dc
             grid[r][c] = letter
     
+    def word_exists_in_grid(self, word):
+        """Check if a word exists anywhere in the grid."""
+        word_reversed = word[::-1]
+        
+        # Check all positions and directions
+        for row in range(GRID_SIZE):
+            for col in range(GRID_SIZE):
+                for dr, dc in DIRECTIONS:
+                    # Check forward
+                    if check_word_at_position(self.grid_data, word, row, col, dr, dc):
+                        return True
+                    # Check reversed
+                    if check_word_at_position(self.grid_data, word_reversed, row, col, dr, dc):
+                        return True
+        return False
+    
     def submit_word(self, word, player_id):
-        word = word.upper()
+        word = word.upper().strip()
+        
+        # Basic validation
+        if not word or len(word) < 3:
+            return {
+                "success": False,
+                "word": word,
+                "isBonus": False,
+                "alreadyFound": False,
+                "foundWords": self.found_words,
+                "error": "Word must be at least 3 letters long"
+            }
+        
+        # Check if word contains only letters
+        if not word.isalpha():
+            return {
+                "success": False,
+                "word": word,
+                "isBonus": False,
+                "alreadyFound": False,
+                "foundWords": self.found_words,
+                "error": "Word must contain only letters"
+            }
         
         # Check if already found
         for found_word in self.found_words:
@@ -170,6 +208,17 @@ class GameSession:
                     "alreadyFound": True,
                     "foundWords": self.found_words
                 }
+        
+        # Validate that the word actually exists in the grid
+        if not self.word_exists_in_grid(word):
+            return {
+                "success": False,
+                "word": word,
+                "isBonus": False,
+                "alreadyFound": False,
+                "foundWords": self.found_words,
+                "error": "Word not found in grid"
+            }
         
         # Check if it's a bonus word
         is_bonus = word not in self.words
@@ -394,6 +443,14 @@ def submit_word():
     session_id = data.get('sessionId')
     word = data.get('word')
     player_id = data.get('playerId')
+    
+    # Basic input validation
+    if not session_id or not word or not player_id:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Validate word format
+    if not isinstance(word, str) or len(word) > 20:
+        return jsonify({"error": "Invalid word format"}), 400
     
     with game_lock:
         if not current_game or current_game.session_id != session_id:
