@@ -5,6 +5,7 @@ class GameInjector {
     this.gameDetected = false;
     this.socket = null;
     this.playerId = null;
+    this.notificationSide = 'right'; // Track which side for alternating notifications
     
     // Wait for the game to load
     this.waitForGame();
@@ -565,29 +566,36 @@ class GameInjector {
   showWordFoundNotification(word, user) {
     // Create notification element
     const notification = document.createElement('div');
-    // Find the puzzle title element to position relative to it
-    const puzzleTitle = document.getElementById('puzzle-title');
+    // Find the words counter element to align with it
+    const wordsCounter = document.getElementById('words-counter');
     const puzzleInfo = document.getElementById('puzzle-info');
     
-    if (puzzleTitle && puzzleInfo) {
-      // Position relative to puzzle title
-      const rect = puzzleTitle.getBoundingClientRect();
+    // Alternate notification side
+    const isRightSide = this.notificationSide === 'right';
+    this.notificationSide = this.notificationSide === 'right' ? 'left' : 'right';
+    
+    if (wordsCounter && puzzleInfo) {
+      // Position inside the puzzle info box, centered vertically
       const infoRect = puzzleInfo.getBoundingClientRect();
+      
+      const sideProperty = isRightSide ? 'right' : 'left';
+      const animationName = isRightSide ? 'slideInFromRight' : 'slideInFromLeft';
       
       notification.style.cssText = `
         position: absolute;
-        top: ${rect.top - infoRect.top + window.scrollY + 5}px;
-        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        ${sideProperty}: 15px;
         background: linear-gradient(135deg, #ff0050 0%, #ff4d8f 100%);
         color: white;
         padding: 8px 12px;
-        border-radius: 20px;
-        font-size: 14px;
+        border-radius: 16px;
+        font-size: 13px;
         font-weight: bold;
         z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        animation: slideInFromRight 0.3s ease-out;
-        max-width: 180px;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+        animation: ${animationName} 0.3s ease-out;
+        max-width: 160px;
         text-align: center;
         font-family: Arial, sans-serif;
         pointer-events: none;
@@ -596,7 +604,7 @@ class GameInjector {
         border: 2px solid rgba(255, 255, 255, 0.4);
       `;
       
-      // Insert into the puzzle info container instead of body
+      // Insert into the puzzle info container
       puzzleInfo.style.position = 'relative';
       puzzleInfo.appendChild(notification);
     } else {
@@ -658,21 +666,41 @@ class GameInjector {
       style.textContent = `
         @keyframes slideInFromRight {
           0% { 
-            transform: translateX(100%) translateZ(0); 
+            transform: translateX(100%) translateY(-50%) translateZ(0); 
             opacity: 0; 
           }
           100% { 
-            transform: translateX(0) translateZ(0); 
+            transform: translateX(0) translateY(-50%) translateZ(0); 
             opacity: 1; 
           }
         }
         @keyframes slideOutToRight {
           0% { 
-            transform: translateX(0) translateZ(0); 
+            transform: translateX(0) translateY(-50%) translateZ(0); 
             opacity: 1; 
           }
           100% { 
-            transform: translateX(100%) translateZ(0); 
+            transform: translateX(100%) translateY(-50%) translateZ(0); 
+            opacity: 0; 
+          }
+        }
+        @keyframes slideInFromLeft {
+          0% { 
+            transform: translateX(-100%) translateY(-50%) translateZ(0); 
+            opacity: 0; 
+          }
+          100% { 
+            transform: translateX(0) translateY(-50%) translateZ(0); 
+            opacity: 1; 
+          }
+        }
+        @keyframes slideOutToLeft {
+          0% { 
+            transform: translateX(0) translateY(-50%) translateZ(0); 
+            opacity: 1; 
+          }
+          100% { 
+            transform: translateX(-100%) translateY(-50%) translateZ(0); 
             opacity: 0; 
           }
         }
@@ -707,8 +735,9 @@ class GameInjector {
     
     // Remove after 3 seconds
     setTimeout(() => {
-      if (puzzleTitle && puzzleInfo && notification.parentNode === puzzleInfo) {
-        notification.style.animation = 'slideOutToRight 0.3s ease-in';
+      if (wordsCounter && puzzleInfo && notification.parentNode === puzzleInfo) {
+        const exitAnimation = isRightSide ? 'slideOutToRight' : 'slideOutToLeft';
+        notification.style.animation = `${exitAnimation} 0.3s ease-in`;
       } else {
         notification.style.animation = 'popOut 0.3s ease-in';
       }
