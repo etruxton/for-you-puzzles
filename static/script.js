@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval = null;
     let socket = null;
     let gameEmojiGrid = null;
+    let puzzleCompletionTime = null;
     
     const directions = [
         { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
@@ -342,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bonusWordsFound = 0;
         bonusWordsArray = [];
         gameEmojiGrid = null;
+        puzzleCompletionTime = null;
         
         // Process already found words
         if (gameData.foundWords) {
@@ -623,8 +625,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeTaken = Date.now() - startTime.getTime();
         const minutesTaken = Math.floor(timeTaken / 60000);
         const secondsTaken = Math.floor((timeTaken % 60000) / 1000);
-        document.getElementById('time-taken').textContent = 
-            `${minutesTaken}:${secondsTaken.toString().padStart(2, '0')}`;
+        const timeString = `${minutesTaken}:${secondsTaken.toString().padStart(2, '0')}`;
+        
+        // Store completion time for copy function
+        puzzleCompletionTime = timeString;
+        
+        document.getElementById('time-taken').textContent = timeString;
         
         // Show found words
         const celebrationFoundWords = document.getElementById('celebration-found-words');
@@ -835,12 +841,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCopyButton(copyCelebrationBtn, () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
-        return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
+        const timeText = puzzleCompletionTime ? `\nCompleted in: ${puzzleCompletionTime}` : '';
+        return `For You Puzzles - ${category}${timeText}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
     
     setupCopyButton(copySummaryBtn, () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
+        // No completion time for summary (timeout case)
         return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
 
