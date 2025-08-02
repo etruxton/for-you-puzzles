@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('tiktokWordSubmitted', (event) => {
         const tiktokInfo = event.detail;
         tiktokSubmissions.set(tiktokInfo.word, tiktokInfo);
-        console.log('Base game: Received TikTok submission:', tiktokInfo);
     });
 
     // --- Username Generation ---
@@ -295,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Notification System ---
     function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null, tiktokInfo = null) {
-        console.log('Notification function called with:', { word, username, isCurrentPlayer, foundByPlayerId, tiktokInfo });
         
         // Create notification element
         const notification = document.createElement('div');
@@ -514,14 +512,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         socket.on('current_game', (gameData) => {
-            console.log('Received current game:', gameData);
+            console.log('Received current game');
             if (gameData) {
                 loadGameSession(gameData);
             }
         });
         
         socket.on('new_game', (gameData) => {
-            console.log('New game started:', gameData);
+            console.log('New game started');
             
             // Check if we're in the middle of a celebration or summary screen
             const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
@@ -548,17 +546,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.word) {
                     let tiktokInfo = data.tiktokUser || tiktokSubmissions.get(data.word.toUpperCase());
                     
-                    console.log('Base game: Checking word', data.word.toUpperCase(), 'TikTok info:', tiktokInfo);
-                    
                     if (tiktokInfo) {
                         // TikTok submission - show pink notification with TikTok info
-                        console.log('Base game: Showing TikTok notification for', tiktokInfo.username);
                         showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
                         // Clean up local extension data after use
                         tiktokSubmissions.delete(data.word.toUpperCase());
                     } else {
                         // Regular submission - show purple notification
-                        console.log('Base game: Showing regular notification');
                         const isCurrentPlayer = data.foundBy === playerId;
                         let username;
                         if (isCurrentPlayer) {
@@ -590,7 +584,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.emojiGrid) {
                 gameEmojiGrid = data.emojiGrid;
             }
-            // The celebration screen will show the reduced countdown automatically
+            // Show the celebration screen
+            celebratePuzzleCompletion();
         });
         
         socket.on('game_timeout', (data) => {

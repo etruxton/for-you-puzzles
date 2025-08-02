@@ -57,7 +57,7 @@
   {
     "puzzleId": "PIRATES",
     "category": "Pirates",
-    "words": ["TREASURE", "ISLAND", "SHIP", "OCEAN", "GOLD", "CANNON", "PARROT", "SWORD", "CAPTAIN", "SAIL", "JOLLYROGER"]
+    "words": ["TREASURE", "ISLAND", "SHIP", "OCEAN", "GOLD", "CANNON", "PARROT", "SWORD", "CAPTAIN", "SAIL", "MATE"]
   },
   {
     "puzzleId": "ART",
@@ -122,12 +122,12 @@
   {
     "puzzleId": "VIDEO_GAMES",
     "category": "Video Games",
-    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "PLAYER", "PIXEL", "JOYSTICK"]
+    "words": ["PLAYER", "LEVEL", "BOSS", "QUEST", "POWERUP", "CONTROLLER", "CONSOLE", "AVATAR", "GAMER", "PIXEL", "JOYSTICK"]
   },
   {
     "puzzleId": "IN_THE_GARDEN",
     "category": "In the Garden",
-    "words": ["FLOWERS", "VEGETABLE", "SEEDS", "SHOVEL", "RAKE", "SOIL", "WATERING", "GARDENER", "WHEELBARROW", "HOSE"]
+    "words": ["FLOWERS", "VEGETABLE", "SEEDS", "SHOVEL", "RAKE", "SOIL", "WATER", "GARDENER", "HOE", "HOSE"]
   },
   {
     "puzzleId": "SHAPES_AND_COLORS",
