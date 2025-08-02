@@ -624,13 +624,14 @@ class GameInjector {
         background: linear-gradient(135deg, #ff0050 0%, #ff4d8f 100%);
         color: white;
         padding: 8px 12px;
-        border-radius: 16px;
+        margin: 10px;
+        border-radius: 15px;
         font-size: 13px;
         font-weight: bold;
         z-index: 1000;
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
         animation: ${animationName} 0.3s ease-out;
-        max-width: 160px;
+        max-width: 150px;
         text-align: center;
         font-family: Arial, sans-serif;
         pointer-events: none;
