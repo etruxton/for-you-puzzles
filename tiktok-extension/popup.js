@@ -87,8 +87,25 @@ class PopupController {
   
   async loadStatus() {
     try {
+      // First get current status
       const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
       this.updateUI(response);
+      
+      // If game is not detected, trigger a re-check
+      if (!response.gameTabActive) {
+        console.log('Game not detected, triggering re-check...');
+        await chrome.runtime.sendMessage({ type: 'RECHECK_GAME_TAB' });
+        
+        // Wait a moment and check status again
+        setTimeout(async () => {
+          try {
+            const updatedResponse = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+            this.updateUI(updatedResponse);
+          } catch (error) {
+            console.error('Failed to get updated status:', error);
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('Failed to load status:', error);
     }

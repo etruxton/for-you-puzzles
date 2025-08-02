@@ -165,6 +165,14 @@ class GameInjector {
           break;
           
         case 'GET_GAME_STATUS':
+          // If game not detected, try to detect it again
+          if (!this.gameDetected) {
+            console.log('Game not detected, trying to re-detect...');
+            if (this.detectGame()) {
+              this.initializeGameIntegration();
+            }
+          }
+          
           sendResponse({
             gameDetected: this.gameDetected,
             playerId: this.playerId,
@@ -801,9 +809,11 @@ let gameInjector = null;
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     gameInjector = new GameInjector();
+    window.gameInjector = gameInjector; // Make it globally accessible
   });
 } else {
   gameInjector = new GameInjector();
+  window.gameInjector = gameInjector; // Make it globally accessible
 }
 
 // Clean up on page unload

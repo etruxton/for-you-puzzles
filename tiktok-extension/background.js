@@ -73,6 +73,11 @@ class TikTokBridge {
           sendResponse({ success: true });
           break;
           
+        case 'RECHECK_GAME_TAB':
+          await this.recheckGameTab();
+          sendResponse({ success: true });
+          break;
+          
         case 'TIKTOK_COMMENT':
           if (this.isConnected && sender.tab.id === this.tiktokTabId) {
             await this.processComment(message.comment, message.user);
@@ -248,6 +253,59 @@ class TikTokBridge {
     }
     
     await this.updateStatus();
+  }
+  
+  async recheckGameTab() {
+    console.log('Rechecking for game tabs...');
+    
+    try {
+      // Look for game tabs
+      const tabs = await chrome.tabs.query({});
+      
+      for (const tab of tabs) {
+        // Check if this tab looks like a game tab
+        if (tab.url && (
+          tab.url.includes('localhost') ||
+          tab.url.includes('127.0.0.1') ||
+          tab.url.includes('foryoupuzzles.com')
+        )) {
+          console.log('Found potential game tab:', tab.url);
+          
+          // Try to send a message to check if the game injector is active
+          try {
+            const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_GAME_STATUS' });
+            if (response && response.gameDetected) {
+              console.log('Game detected in tab:', tab.id);
+              this.gameTabId = tab.id;
+              await this.updateStatus();
+              return;
+            }
+          } catch (error) {
+            // Content script might not be loaded yet, try to inject and initialize
+            console.log('Content script not responding, trying to re-inject...');
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: () => {
+                  // Trigger re-initialization if the injector exists
+                  if (window.gameInjector) {
+                    window.gameInjector.waitForGame();
+                  }
+                }
+              });
+            } catch (injectError) {
+              console.log('Could not re-inject into tab:', injectError);
+            }
+          }
+        }
+      }
+      
+      console.log('No active game tabs found');
+      await this.updateStatus();
+      
+    } catch (error) {
+      console.error('Error rechecking game tabs:', error);
+    }
   }
 }
 
