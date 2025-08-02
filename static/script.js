@@ -48,6 +48,71 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('playerId', playerId);
     }
 
+    // Generate random username for display
+    let playerUsername = localStorage.getItem('playerUsername');
+    if (!playerUsername) {
+        playerUsername = generateRandomUsername();
+        localStorage.setItem('playerUsername', playerUsername);
+    }
+
+    // Notification system state
+    let notificationSide = 'right'; // Track which side for alternating notifications
+
+    // --- Username Generation ---
+    function generateRandomUsername() {
+        const adjectives = [
+            'Swift', 'Clever', 'Bright', 'Quick', 'Sharp', 'Wise', 'Bold', 'Cool',
+            'Epic', 'Wild', 'Calm', 'Pure', 'Fast', 'Smart', 'Rare', 'Free',
+            'Dark', 'Soft', 'Deep', 'High', 'Rich', 'Warm', 'Cold', 'Loud',
+            'Quiet', 'Strong', 'Light', 'Heavy', 'Smooth', 'Rough', 'Fresh', 'Sweet'
+        ];
+        
+        const nouns = [
+            'Wizard', 'Phoenix', 'Dragon', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear',
+            'Hawk', 'Lion', 'Shark', 'Falcon', 'Raven', 'Lynx', 'Panther', 'Viper',
+            'Storm', 'Flame', 'Shadow', 'Blade', 'Arrow', 'Star', 'Moon', 'Sun',
+            'Ocean', 'Thunder', 'Lightning', 'Wind', 'Fire', 'Ice', 'Stone', 'Steel'
+        ];
+        
+        const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        const number = Math.floor(Math.random() * 999) + 1;
+        
+        return `${adjective}${noun}${number}`;
+    }
+
+    // Generate consistent username based on player ID
+    function generateUsernameFromPlayerId(playerId) {
+        const adjectives = [
+            'Swift', 'Clever', 'Bright', 'Quick', 'Sharp', 'Wise', 'Bold', 'Cool',
+            'Epic', 'Wild', 'Calm', 'Pure', 'Fast', 'Smart', 'Rare', 'Free',
+            'Dark', 'Soft', 'Deep', 'High', 'Rich', 'Warm', 'Cold', 'Loud',
+            'Quiet', 'Strong', 'Light', 'Heavy', 'Smooth', 'Rough', 'Fresh', 'Sweet'
+        ];
+        
+        const nouns = [
+            'Wizard', 'Phoenix', 'Dragon', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear',
+            'Hawk', 'Lion', 'Shark', 'Falcon', 'Raven', 'Lynx', 'Panther', 'Viper',
+            'Storm', 'Flame', 'Shadow', 'Blade', 'Arrow', 'Star', 'Moon', 'Sun',
+            'Ocean', 'Thunder', 'Lightning', 'Wind', 'Fire', 'Ice', 'Stone', 'Steel'
+        ];
+        
+        // Generate hash from player ID for consistency
+        let hash = 0;
+        for (let i = 0; i < playerId.length; i++) {
+            hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        const adjIndex = Math.abs(hash) % adjectives.length;
+        const nounIndex = Math.abs(hash >> 8) % nouns.length;
+        const number = (Math.abs(hash >> 16) % 999) + 1;
+        
+        return `${adjectives[adjIndex]}${nouns[nounIndex]}${number}`;
+    }
+
+    // Cache for generated usernames
+    const usernameCache = {};
+
     // --- Avatar Generation ---
     function generateAvatar(playerId) {
         // Use player ID to generate consistent values
@@ -216,6 +281,185 @@ document.addEventListener('DOMContentLoaded', () => {
         return `hsl(${hue}, 70%, 80%)`;
     }
 
+    // --- Notification System ---
+    function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null) {
+        // Create notification element
+        const notification = document.createElement('div');
+        const wordsCounter = document.getElementById('words-counter');
+        const puzzleInfo = document.getElementById('puzzle-info');
+        
+        // Alternate notification side
+        const isRightSide = notificationSide === 'right';
+        notificationSide = notificationSide === 'right' ? 'left' : 'right';
+        
+        if (wordsCounter && puzzleInfo) {
+            const sideProperty = isRightSide ? 'right' : 'left';
+            const animationName = isRightSide ? 'slideInFromRight' : 'slideInFromLeft';
+            
+            // Purple for base game, vs pink for TikTok extension
+            const bgColor = 'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
+            
+            notification.style.cssText = `
+                position: absolute;
+                top: 50%;
+                transform: translateY(-50%);
+                ${sideProperty}: 15px;
+                background: ${bgColor};
+                color: white;
+                padding: 8px 12px;
+                border-radius: 16px;
+                font-size: 13px;
+                font-weight: bold;
+                z-index: 1000;
+                box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+                animation: ${animationName} 0.3s ease-out;
+                max-width: 160px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+                pointer-events: none;
+                user-select: none;
+                backface-visibility: hidden;
+                border: 2px solid rgba(255, 255, 255, 0.4);
+            `;
+            
+            // Insert into the puzzle info container
+            puzzleInfo.style.position = 'relative';
+            puzzleInfo.appendChild(notification);
+        } else {
+            // Fallback positioning
+            notification.style.cssText = `
+                position: fixed;
+                top: 20%;
+                left: 50%;
+                transform: translate(-50%, 0) translateZ(0);
+                background: linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+                animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                max-width: 250px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+                pointer-events: none;
+                user-select: none;
+                backface-visibility: hidden;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+            `;
+            
+            document.body.appendChild(notification);
+        }
+        
+        // Create avatar for the notification
+        const avatarSize = '24px';
+        const avatarPlayerId = foundByPlayerId || playerId;
+        const avatarSvg = generateAvatar(avatarPlayerId);
+        const avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+        
+        const displayName = isCurrentPlayer ? 'You' : username;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center;">
+                ${avatarHtml}
+                <div>
+                    <strong>${word}</strong><br>
+                    <small>Found by ${displayName}</small>
+                </div>
+            </div>
+        `;
+        
+        // Add animation keyframes if not already added
+        if (!document.getElementById('base-game-animations')) {
+            const style = document.createElement('style');
+            style.id = 'base-game-animations';
+            style.textContent = `
+                @keyframes slideInFromRight {
+                    0% { 
+                        transform: translateX(100%) translateY(-50%) translateZ(0); 
+                        opacity: 0; 
+                    }
+                    100% { 
+                        transform: translateX(0) translateY(-50%) translateZ(0); 
+                        opacity: 1; 
+                    }
+                }
+                @keyframes slideOutToRight {
+                    0% { 
+                        transform: translateX(0) translateY(-50%) translateZ(0); 
+                        opacity: 1; 
+                    }
+                    100% { 
+                        transform: translateX(100%) translateY(-50%) translateZ(0); 
+                        opacity: 0; 
+                    }
+                }
+                @keyframes slideInFromLeft {
+                    0% { 
+                        transform: translateX(-100%) translateY(-50%) translateZ(0); 
+                        opacity: 0; 
+                    }
+                    100% { 
+                        transform: translateX(0) translateY(-50%) translateZ(0); 
+                        opacity: 1; 
+                    }
+                }
+                @keyframes slideOutToLeft {
+                    0% { 
+                        transform: translateX(0) translateY(-50%) translateZ(0); 
+                        opacity: 1; 
+                    }
+                    100% { 
+                        transform: translateX(-100%) translateY(-50%) translateZ(0); 
+                        opacity: 0; 
+                    }
+                }
+                @keyframes popIn {
+                    0% { 
+                        transform: translate(-50%, 0) scale(0.5) translateZ(0); 
+                        opacity: 0; 
+                    }
+                    50% { 
+                        transform: translate(-50%, 0) scale(1.1) translateZ(0); 
+                    }
+                    100% { 
+                        transform: translate(-50%, 0) scale(1) translateZ(0); 
+                        opacity: 1; 
+                    }
+                }
+                @keyframes popOut {
+                    0% { 
+                        transform: translate(-50%, 0) scale(1) translateZ(0); 
+                        opacity: 1; 
+                    }
+                    100% { 
+                        transform: translate(-50%, 0) scale(0.8) translateZ(0); 
+                        opacity: 0; 
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (wordsCounter && puzzleInfo && notification.parentNode === puzzleInfo) {
+                const exitAnimation = isRightSide ? 'slideOutToRight' : 'slideOutToLeft';
+                notification.style.animation = `${exitAnimation} 0.3s ease-in`;
+            } else {
+                notification.style.animation = 'popOut 0.3s ease-in';
+            }
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+
     // --- Socket.IO Connection ---
     function connectSocket() {
         // Use relative path for Socket.IO to work on both local and Heroku
@@ -264,6 +508,22 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('word_found', (data) => {
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
+
+                // Show notification for the word found
+                if (data.word) {
+                    const isCurrentPlayer = data.foundBy === playerId;
+                    let username;
+                    if (isCurrentPlayer) {
+                        username = playerUsername;
+                    } else {
+                        // Generate consistent username for other players
+                        if (!usernameCache[data.foundBy]) {
+                            usernameCache[data.foundBy] = generateUsernameFromPlayerId(data.foundBy);
+                        }
+                        username = usernameCache[data.foundBy];
+                    }
+                    showWordFoundNotification(data.word, username, isCurrentPlayer, data.foundBy);
+                }
 
                 // Highlight the word on the grid if someone else found it
                 if (data.foundBy && data.foundBy !== playerId && data.word) {
