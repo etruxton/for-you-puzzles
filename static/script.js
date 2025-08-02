@@ -16,6 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const bonusCount = document.getElementById('bonus-count');
     const summaryOverlay = document.getElementById('summary-overlay');
     const summaryCountdown = document.getElementById('summary-countdown');
+    const celebrationEmojiGrid = document.getElementById('celebration-emoji-grid');
+    const summaryEmojiGrid = document.getElementById('summary-emoji-grid');
+    const copyCelebrationBtn = document.getElementById('copy-celebration-emoji');
+    const copySummaryBtn = document.getElementById('copy-summary-emoji');
     
     // --- Game State ---
     const gridSize = 10;
@@ -29,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let bonusWordsArray = [];
     let timerInterval = null;
     let socket = null;
+    let gameEmojiGrid = null;
     
     const directions = [
         { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
@@ -271,11 +276,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         socket.on('puzzle_completed', (data) => {
             console.log('Puzzle completed:', data.message);
+            // Store the emoji grid
+            if (data.emojiGrid) {
+                gameEmojiGrid = data.emojiGrid;
+            }
             // The celebration screen will show the reduced countdown automatically
         });
         
         socket.on('game_timeout', (data) => {
             console.log('Game timed out:', data.message);
+            // Store the emoji grid
+            if (data.emojiGrid) {
+                gameEmojiGrid = data.emojiGrid;
+            } else {
+                gameEmojiGrid = null;
+            }
             // Show the summary screen when game times out
             if (currentSession && currentSession.status === 'ACTIVE') {
                 currentSession.status = 'EXPIRED';
@@ -326,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         foundOriginalWords.clear();
         bonusWordsFound = 0;
         bonusWordsArray = [];
+        gameEmojiGrid = null;
         
         // Process already found words
         if (gameData.foundWords) {
@@ -588,8 +604,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function celebratePuzzleCompletion() {
+    async function celebratePuzzleCompletion() {
         if (timerInterval) clearInterval(timerInterval);
+        
+        // Request current game state to get emoji grid
+        try {
+            const response = await fetch(`${SERVER_URL}/api/current-game`);
+            const gameData = await response.json();
+            if (gameData && gameData.emojiGrid) {
+                gameEmojiGrid = gameData.emojiGrid;
+            }
+        } catch (error) {
+            console.error('Error fetching emoji grid:', error);
+        }
 
         // Calculate time taken
         const startTime = new Date(currentSession.startTime);
@@ -619,6 +646,13 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = word;
             celebrationBonusWords.appendChild(span);
         });
+        
+        // Display emoji grid if available
+        if (gameEmojiGrid && celebrationEmojiGrid) {
+            celebrationEmojiGrid.textContent = gameEmojiGrid;
+        } else if (celebrationEmojiGrid) {
+            celebrationEmojiGrid.textContent = 'Grid not available';
+        }
         
         celebrationOverlay.classList.remove('hidden');
         
@@ -711,6 +745,13 @@ document.addEventListener('DOMContentLoaded', () => {
             bonusWordsSummary.appendChild(span);
         });
         
+        // Display emoji grid if available
+        if (gameEmojiGrid && summaryEmojiGrid) {
+            summaryEmojiGrid.textContent = gameEmojiGrid;
+        } else if (summaryEmojiGrid) {
+            summaryEmojiGrid.textContent = 'Grid not available';
+        }
+        
         summaryOverlay.classList.remove('hidden');
         
         // Countdown to next game
@@ -764,6 +805,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Enter') {
             processGuess(wordInput.value);
         }
+    });
+
+    // --- Copy Button Functionality ---
+    function setupCopyButton(button, getTextFunc) {
+        if (!button) return; // Skip if button doesn't exist
+        
+        button.addEventListener('click', async () => {
+            try {
+                const textToCopy = getTextFunc();
+                await navigator.clipboard.writeText(textToCopy);
+                
+                // Show success feedback
+                button.classList.add('copied');
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        });
+    }
+    
+    // Setup copy buttons
+    setupCopyButton(copyCelebrationBtn, () => {
+        const category = currentSession ? currentSession.category : 'Word Search';
+        const emojiGrid = gameEmojiGrid || 'No grid available';
+        return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
+    });
+    
+    setupCopyButton(copySummaryBtn, () => {
+        const category = currentSession ? currentSession.category : 'Word Search';
+        const emojiGrid = gameEmojiGrid || 'No grid available';
+        return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
 
     // --- Initialize ---

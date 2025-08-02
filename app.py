@@ -64,6 +64,7 @@ class GameSession:
         self.puzzle_id = puzzle["puzzleId"]
         self.category = puzzle["category"]
         self.words = [w.upper() for w in puzzle["words"]]
+        self.word_positions = {}  # Store positions of all words in the grid
         self.grid_data = self.generate_grid()
         self.start_time = datetime.now(timezone.utc)
         self.end_time = self.start_time + timedelta(seconds=120)
@@ -110,6 +111,13 @@ class GameSession:
                         'col': col,
                         'direction': direction
                     })
+                    # Store word position for emoji grid
+                    self.word_positions[word] = {
+                        'row': row,
+                        'col': col,
+                        'direction': direction,
+                        'length': len(word)
+                    }
                     placed = True
                 
                 if not placed:
@@ -172,6 +180,33 @@ class GameSession:
                     if check_word_at_position(self.grid_data, word_reversed, row, col, dr, dc):
                         return True
         return False
+    
+    def find_word_position(self, word):
+        """Find the position of a word in the grid."""
+        word_reversed = word[::-1]
+        
+        # Check all positions and directions
+        for row in range(GRID_SIZE):
+            for col in range(GRID_SIZE):
+                for dr, dc in DIRECTIONS:
+                    # Check forward
+                    if check_word_at_position(self.grid_data, word, row, col, dr, dc):
+                        return {
+                            'row': row,
+                            'col': col,
+                            'direction': (dr, dc),
+                            'length': len(word)
+                        }
+                    # Check reversed
+                    if check_word_at_position(self.grid_data, word_reversed, row, col, dr, dc):
+                        return {
+                            'row': row,
+                            'col': col,
+                            'direction': (dr, dc),
+                            'length': len(word)
+                        }
+        return None
+    
     
     def submit_word(self, word, player_id):
         word = word.upper().strip()
@@ -245,8 +280,38 @@ class GameSession:
             "foundBy": player_id
         }
     
+    def generate_emoji_grid(self):
+        """Generate a 10x10 emoji grid showing found (green) and missed (red) words."""
+        # Create a 10x10 grid initialized with white squares
+        emoji_grid = [['⬜' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+        
+        # Get list of found words (only original puzzle words, not bonus)
+        found_word_names = {fw["word"] for fw in self.found_words if not fw.get("isBonus", False)}
+        
+        # Mark each word's position with appropriate color
+        for word in self.words:
+            if word in self.word_positions:
+                pos_info = self.word_positions[word]
+                row, col = pos_info['row'], pos_info['col']
+                dr, dc = pos_info['direction']
+                emoji = '🟩' if word in found_word_names else '🟥'
+                
+                # Mark all cells for this word
+                for i in range(len(word)):
+                    r = row + i * dr
+                    c = col + i * dc
+                    if 0 <= r < GRID_SIZE and 0 <= c < GRID_SIZE:
+                        emoji_grid[r][c] = emoji
+        
+        # Convert to string format
+        grid_lines = []
+        for row in emoji_grid:
+            grid_lines.append(''.join(row))
+        
+        return '\n'.join(grid_lines)
+    
     def to_dict(self):
-        return {
+        data = {
             "sessionId": self.session_id,
             "puzzleId": self.puzzle_id,
             "category": self.category,
@@ -257,6 +322,12 @@ class GameSession:
             "foundWords": self.found_words,
             "status": self.status
         }
+        
+        # Include emoji grid only when game is completed or expired
+        if self.status in ["COMPLETED", "EXPIRED"]:
+            data["emojiGrid"] = self.generate_emoji_grid()
+        
+        return data
 
 def start_new_game(delay_seconds=0):
     """Start a new game, optionally after a delay."""
@@ -329,7 +400,8 @@ def start_new_game(delay_seconds=0):
                                 current_game.status = "EXPIRED"
                                 # Notify clients that the game has timed out
                                 socketio.emit('game_timeout', {
-                                    'message': 'Time\'s up! New game starting in 10 seconds...'
+                                    'message': 'Time\'s up! New game starting in 10 seconds...',
+                                    'emojiGrid': current_game.generate_emoji_grid()
                                 }, room='game')
                         start_new_game(10)
                     
@@ -361,7 +433,8 @@ def start_early_completion_timer():
         
         # Notify all clients that puzzle was completed
         socketio.emit('puzzle_completed', {
-            'message': 'Puzzle completed! New game starting in 10 seconds...'
+            'message': 'Puzzle completed! New game starting in 10 seconds...',
+            'emojiGrid': current_game.generate_emoji_grid()
         }, room='game')
         
         # Cancel the existing game timer
