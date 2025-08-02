@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Word Search Bridge</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 TikTok Bridge</h1>
+            <p>Connect TikTok Live to Word Search</p>
+        </header>
+
+        <div class="status-section">
+            <div class="status-item">
+                <span class="status-label">Game:</span>
+                <span id="game-status" class="status-value">Not Connected</span>
+                <span id="game-indicator" class="indicator"></span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">TikTok:</span>
+                <span id="tiktok-status" class="status-value">Not Connected</span>
+                <span id="tiktok-indicator" class="indicator"></span>
+            </div>
+        </div>
+
+        <div class="connection-section">
+            <div class="input-group">
+                <label for="username-input">TikTok Username:</label>
+                <input type="text" id="username-input" placeholder="@soothe.bell" value="@soothe.bell">
+            </div>
+            <button id="connect-btn" class="primary-btn">Connect to TikTok Live</button>
+        </div>
+
+        <div class="test-section">
+            <div class="section-header">
+                <h3>Test Mode</h3>
+                <label class="toggle">
+                    <input type="checkbox" id="test-mode-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div id="test-controls" class="test-controls hidden">
+                <div class="input-group">
+                    <input type="text" id="test-comment" placeholder="Type test comment...">
+                    <input type="text" id="test-username" placeholder="Username" value="TestUser">
+                </div>
+                <button id="send-test-btn" class="secondary-btn">Send Test Comment</button>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h4>How it works:</h4>
+            <ol>
+                <li>Open your word search game in another tab</li>
+                <li>Enter your TikTok username and connect</li>
+                <li>Start your TikTok Live stream</li>
+                <li>Viewers' comments will automatically find words!</li>
+            </ol>
+        </div>
+
+        <div class="footer">
+            <p class="version">v1.0</p>
+            <div class="links">
+                <button id="refresh-btn" class="link-btn">Refresh</button>
+                <button id="help-btn" class="link-btn">Help</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
