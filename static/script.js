@@ -48,12 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('playerId', playerId);
     }
 
-    // Generate random username for display
+    // Player username will be generated after the function is defined
     let playerUsername = localStorage.getItem('playerUsername');
-    if (!playerUsername) {
-        playerUsername = generateRandomUsername();
-        localStorage.setItem('playerUsername', playerUsername);
-    }
 
     // Notification system state
     let notificationSide = 'right'; // Track which side for alternating notifications
@@ -122,6 +118,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cache for generated usernames
     const usernameCache = {};
+
+    // Generate deterministic username for current player if not already set
+    if (!playerUsername) {
+        playerUsername = generateUsernameFromPlayerId(playerId);
+        localStorage.setItem('playerUsername', playerUsername);
+    }
 
     // --- Avatar Generation ---
     function generateAvatar(playerId) {
