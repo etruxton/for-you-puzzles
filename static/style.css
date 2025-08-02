@@ -69,7 +69,7 @@ h1, h2 {
     align-items: center;
     z-index: 1000;
     box-sizing: border-box;
-    padding: 10px;
+    padding: 20px;
 }
 
 #celebration-overlay.hidden {
@@ -82,34 +82,38 @@ h1, h2 {
     border-radius: 15px;
     text-align: center;
     border: 3px solid #03dac6;
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow-y: auto;
+    width: min(90vw, 600px);
+    max-height: calc(100vh - 40px);
+    overflow: hidden;
     animation: celebration-pulse 0.5s ease-in-out;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    font-size: min(1rem, 2.5vmin);
 }
 
 .celebration-content h2 {
-    font-size: 36px;
-    margin-bottom: 15px;
+    font-size: 2.5em;
+    margin: 0.4em 0;
     color: #03dac6;
 }
 
 .celebration-content h3 {
-    font-size: 20px;
-    margin: 10px 0;
+    font-size: 1.4em;
+    margin: 0.3em 0;
     color: #bb86fc;
 }
 
 .celebration-content p {
-    font-size: 20px;
-    margin: 10px 0;
+    font-size: 1.4em;
+    margin: 0.3em 0;
 }
 
 .time-taken {
-    font-size: 24px;
+    font-size: 1.6em;
     color: #03dac6;
     font-weight: bold;
-    margin-bottom: 20px;
+    margin: 0.5em 0;
 }
 
 #time-taken {
@@ -117,21 +121,22 @@ h1, h2 {
 }
 
 .celebration-section {
-    margin: 20px 0;
-    padding: 15px;
+    margin: 0.5em 0;
+    padding: 0.8em;
     background-color: #2c2c2c;
     border-radius: 8px;
+    flex-shrink: 0;
 }
 
 .celebration-timer {
-    margin-top: 20px;
-    font-size: 18px;
+    margin-top: 0.5em;
+    font-size: 1.2em;
 }
 
 #countdown {
     color: #bb86fc;
     font-weight: bold;
-    font-size: 24px;
+    font-size: 1.6em;
 }
 
 #celebration-bonus-count {
@@ -163,8 +168,8 @@ h1, h2 {
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    overflow-y: auto;
-    padding: 10px;
+    overflow: hidden;
+    padding: 20px;
     box-sizing: border-box;
 }
 
@@ -178,53 +183,63 @@ h1, h2 {
     border-radius: 15px;
     text-align: center;
     border: 3px solid #bb86fc;
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow-y: auto;
+    width: min(90vw, 700px);
+    max-height: calc(100vh - 40px);
+    overflow: hidden;
     animation: celebration-pulse 0.5s ease-in-out;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    font-size: min(1rem, 2.2vmin);
 }
 
 .summary-content h2 {
-    font-size: 32px;
-    margin-bottom: 20px;
+    font-size: 2.2em;
+    margin: 0.4em 0;
     color: #bb86fc;
 }
 
 .summary-content h3 {
-    font-size: 20px;
-    margin: 15px 0 10px 0;
+    font-size: 1.4em;
+    margin: 0.3em 0;
     color: #03dac6;
 }
 
 .summary-stats {
-    font-size: 20px;
-    margin-bottom: 20px;
+    font-size: 1.3em;
+    margin: 0.5em 0;
 }
 
 .summary-stats p {
-    margin: 5px 0;
+    margin: 0.2em 0;
 }
 
 .summary-section {
-    margin: 20px 0;
-    padding: 15px;
+    margin: 0.4em 0;
+    padding: 0.6em;
     background-color: #2c2c2c;
     border-radius: 8px;
+    flex-shrink: 0;
+    overflow: hidden;
 }
 
 .word-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 0.4em;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 0.3em;
+    max-height: 25vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.2em;
 }
 
 .word-list span {
     background-color: #333;
-    padding: 5px 10px;
+    padding: 0.3em 0.6em;
     border-radius: 5px;
-    font-size: 14px;
+    font-size: 0.9em;
 }
 
 .word-list span.missed {
@@ -243,15 +258,15 @@ h1, h2 {
 }
 
 .summary-timer {
-    font-size: 18px;
-    margin-top: 20px;
+    font-size: 1.2em;
+    margin-top: 0.5em;
     color: #03dac6;
 }
 
 #summary-countdown {
     color: #bb86fc;
     font-weight: bold;
-    font-size: 20px;
+    font-size: 1.4em;
 }
 
 #game-container {
@@ -421,6 +436,41 @@ h1, h2 {
     #grid-container {
         padding: 8px;
         gap: 4px;
+    }
+}
+
+/* Ensure overlays fit on very small screens */
+@media (max-height: 600px) {
+    .celebration-content,
+    .summary-content {
+        font-size: min(0.8rem, 2vmin);
+    }
+    
+    .word-list {
+        max-height: 15vh;
+    }
+    
+    .celebration-section,
+    .summary-section {
+        margin: 0.2em 0;
+        padding: 0.4em;
+    }
+}
+
+@media (max-height: 400px) {
+    .celebration-content,
+    .summary-content {
+        font-size: min(0.65rem, 1.8vmin);
+        padding: 10px;
+    }
+    
+    .word-list {
+        display: none;
+    }
+    
+    .celebration-section h3,
+    .summary-section h3 {
+        margin: 0.1em 0;
     }
 }
 
