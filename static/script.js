@@ -57,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Notification system state
     let notificationSide = 'right'; // Track which side for alternating notifications
+    
+    // TikTok extension integration
+    const tiktokSubmissions = new Map();
+    
+    // Listen for TikTok word submissions
+    window.addEventListener('tiktokWordSubmitted', (event) => {
+        const tiktokInfo = event.detail;
+        tiktokSubmissions.set(tiktokInfo.word, tiktokInfo);
+        console.log('Base game: Received TikTok submission:', tiktokInfo);
+    });
 
     // --- Username Generation ---
     function generateRandomUsername() {
@@ -282,7 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Notification System ---
-    function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null) {
+    function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null, tiktokInfo = null) {
+        console.log('Notification function called with:', { word, username, isCurrentPlayer, foundByPlayerId, tiktokInfo });
+        
         // Create notification element
         const notification = document.createElement('div');
         const wordsCounter = document.getElementById('words-counter');
@@ -296,8 +308,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const sideProperty = isRightSide ? 'right' : 'left';
             const animationName = isRightSide ? 'slideInFromRight' : 'slideInFromLeft';
             
-            // Purple for base game, vs pink for TikTok extension
-            const bgColor = 'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
+            // Pink for TikTok, Purple for base game
+            const bgColor = tiktokInfo ? 
+                'linear-gradient(135deg, #ff0050 0%, #ff4d8f 100%)' : 
+                'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
             
             notification.style.cssText = `
                 position: absolute;
@@ -355,11 +369,30 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Create avatar for the notification
         const avatarSize = '24px';
-        const avatarPlayerId = foundByPlayerId || playerId;
-        const avatarSvg = generateAvatar(avatarPlayerId);
-        const avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+        let avatarHtml;
+        let displayName;
         
-        const displayName = isCurrentPlayer ? 'You' : username;
+        if (tiktokInfo) {
+            // Use TikTok info
+            displayName = tiktokInfo.username;
+            if (tiktokInfo.avatar && !tiktokInfo.isTest) {
+                // Use TikTok profile picture if available
+                avatarHtml = `<img src="${tiktokInfo.avatar}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+            } else {
+                // Generate avatar for test users or when no TikTok avatar
+                const basePlayerId = tiktokInfo.isTest ? 
+                    `test_${tiktokInfo.username}` : 
+                    `tiktok_${tiktokInfo.username}`;
+                const avatarSvg = generateAvatar(basePlayerId);
+                avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+            }
+        } else {
+            // Use regular game info
+            const avatarPlayerId = foundByPlayerId || playerId;
+            const avatarSvg = generateAvatar(avatarPlayerId);
+            avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+            displayName = isCurrentPlayer ? playerUsername : username;
+        }
         
         notification.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center;">
@@ -509,20 +542,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
 
-                // Show notification for the word found
+                // Show notification - check if it comes from TikTok extension
                 if (data.word) {
-                    const isCurrentPlayer = data.foundBy === playerId;
-                    let username;
-                    if (isCurrentPlayer) {
-                        username = playerUsername;
+                    const tiktokInfo = tiktokSubmissions.get(data.word.toUpperCase());
+                    
+                    console.log('Base game: Checking word', data.word.toUpperCase(), 'TikTok info:', tiktokInfo);
+                    
+                    if (tiktokInfo) {
+                        // TikTok submission - show pink notification with TikTok info
+                        console.log('Base game: Showing TikTok notification for', tiktokInfo.username);
+                        showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
+                        // Clean up after use
+                        tiktokSubmissions.delete(data.word.toUpperCase());
                     } else {
-                        // Generate consistent username for other players
-                        if (!usernameCache[data.foundBy]) {
-                            usernameCache[data.foundBy] = generateUsernameFromPlayerId(data.foundBy);
+                        // Regular submission - show purple notification
+                        console.log('Base game: Showing regular notification');
+                        const isCurrentPlayer = data.foundBy === playerId;
+                        let username;
+                        if (isCurrentPlayer) {
+                            username = playerUsername;
+                        } else {
+                            // Generate consistent username for other players
+                            if (!usernameCache[data.foundBy]) {
+                                usernameCache[data.foundBy] = generateUsernameFromPlayerId(data.foundBy);
+                            }
+                            username = usernameCache[data.foundBy];
                         }
-                        username = usernameCache[data.foundBy];
+                        showWordFoundNotification(data.word, username, isCurrentPlayer, data.foundBy, null);
                     }
-                    showWordFoundNotification(data.word, username, isCurrentPlayer, data.foundBy);
                 }
 
                 // Highlight the word on the grid if someone else found it

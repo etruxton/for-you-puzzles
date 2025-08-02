@@ -77,6 +77,12 @@ class GameInjector {
       localStorage.setItem('playerId', this.playerId);
     }
     
+    // Mark TikTok extension as active for the base game
+    window.tiktokExtensionActive = true;
+    
+    // TikTok extension only shows pink notifications for TikTok-submitted words
+    // Regular gameplay words will be handled by the base game with purple notifications
+    
     // Add TikTok status indicator to the game
     this.addTikTokStatusIndicator();
     
@@ -148,6 +154,7 @@ class GameInjector {
       }
     }
   }
+
   
   async handleMessage(message, sender, sendResponse) {
     try {
@@ -190,8 +197,22 @@ class GameInjector {
         };
       }
       
-      // Show visual feedback regardless of API response (since we know word exists)
-      this.showWordFoundNotification(word, user);
+      // Store TikTok user info and dispatch custom event
+      const tiktokInfo = {
+        word: word.toUpperCase(),
+        username: user.username,
+        isTest: user.isTest,
+        avatar: user.avatar
+      };
+      
+      // Dispatch custom event that the base game can listen for
+      window.dispatchEvent(new CustomEvent('tiktokWordSubmitted', { 
+        detail: tiktokInfo 
+      }));
+      
+      console.log('TikTok Bridge: Dispatched tiktokWordSubmitted event:', tiktokInfo);
+      
+      // Don't show notification here - let the base game handle it with pink styling
       this.flashStatusIndicator(true);
       
       // Try to submit to API (but don't rely on its success for highlighting)
