@@ -315,17 +315,21 @@ class GameSession:
             "sessionId": self.session_id,
             "puzzleId": self.puzzle_id,
             "category": self.category,
-            "words": self.words,
             "gridData": self.grid_data,
             "startTime": self.start_time.isoformat(),
             "endTime": self.end_time.isoformat(),
             "foundWords": self.found_words,
-            "status": self.status
+            "status": self.status,
+            "totalWords": len(self.words)  # Send count instead of actual words
         }
         
-        # Include emoji grid only when game is completed or expired
+        # Include emoji grid and missed words when game is completed or expired
         if self.status in ["COMPLETED", "EXPIRED"]:
             data["emojiGrid"] = self.generate_emoji_grid()
+            
+            # Include missed words for results screen
+            found_puzzle_words = {fw["word"] for fw in self.found_words if not fw.get("isBonus", False)}
+            data["missedWords"] = [word for word in self.words if word not in found_puzzle_words]
         
         return data
 
@@ -398,10 +402,16 @@ def start_new_game(delay_seconds=0):
                         with game_lock:
                             if current_game and current_game.status == "ACTIVE":
                                 current_game.status = "EXPIRED"
+                                
+                                # Calculate missed words
+                                found_puzzle_words = {fw["word"] for fw in current_game.found_words if not fw.get("isBonus", False)}
+                                missed_words = [word for word in current_game.words if word not in found_puzzle_words]
+                                
                                 # Notify clients that the game has timed out
                                 socketio.emit('game_timeout', {
                                     'message': 'Time\'s up! New game starting in 10 seconds...',
-                                    'emojiGrid': current_game.generate_emoji_grid()
+                                    'emojiGrid': current_game.generate_emoji_grid(),
+                                    'missedWords': missed_words
                                 }, room='game')
                         start_new_game(10)
                     

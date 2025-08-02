@@ -286,12 +286,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         socket.on('game_timeout', (data) => {
             console.log('Game timed out:', data.message);
-            // Store the emoji grid
+            // Store the emoji grid and missed words
             if (data.emojiGrid) {
                 gameEmojiGrid = data.emojiGrid;
             } else {
                 gameEmojiGrid = null;
             }
+            
+            // Store missed words for the summary screen
+            if (data.missedWords) {
+                currentSession.missedWords = data.missedWords;
+            }
+            
             // Show the summary screen when game times out
             if (currentSession && currentSession.status === 'ACTIVE') {
                 currentSession.status = 'EXPIRED';
@@ -334,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadGameSession(gameData) {
         currentSession = gameData;
-        originalWords = new Set(gameData.words);
+        originalWords = new Set(); // We no longer know the words in advance
         gridData = gameData.gridData;
         
         // Reset found words tracking
@@ -596,14 +602,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI Updates ---
     function updateWordsCounter() {
         foundCount.textContent = foundOriginalWords.size;
-        totalCount.textContent = originalWords.size;
+        totalCount.textContent = currentSession ? currentSession.totalWords : 0;
         bonusCount.textContent = bonusWordsFound;
     }
 
     function checkForCompletion() {
-        if (foundOriginalWords.size === originalWords.size && originalWords.size > 0) {
-            celebratePuzzleCompletion();
-        }
+        // Completion is now handled by the server via socket events
+        // The server will emit 'puzzle_completed' when all words are found
     }
 
     async function celebratePuzzleCompletion() {
@@ -716,20 +721,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Populate summary
         document.getElementById('summary-found').textContent = foundOriginalWords.size;
-        document.getElementById('summary-total').textContent = originalWords.size;
+        document.getElementById('summary-total').textContent = currentSession ? currentSession.totalWords : 0;
         document.getElementById('summary-bonus').textContent = bonusWordsFound;
         
         // Show missed words
         const missedWords = document.getElementById('missed-words');
         missedWords.innerHTML = '';
-        originalWords.forEach(word => {
-            if (!foundOriginalWords.has(word)) {
+        if (currentSession && currentSession.missedWords) {
+            currentSession.missedWords.forEach(word => {
                 const span = document.createElement('span');
                 span.className = 'missed';
                 span.textContent = word;
                 missedWords.appendChild(span);
-            }
-        });
+            });
+        }
         
         // Show found words
         const foundWordsSummary = document.getElementById('found-words-summary');
