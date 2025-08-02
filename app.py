@@ -526,6 +526,7 @@ def submit_word():
     session_id = data.get('sessionId')
     word = data.get('word')
     player_id = data.get('playerId')
+    tiktok_user = data.get('tiktokUser')  # Optional TikTok user info
     
     # Basic input validation
     if not session_id or not word or not player_id:
@@ -554,6 +555,11 @@ def submit_word():
                 "foundWords": result["foundWords"],
                 "foundBy": result["foundBy"]
             }
+            
+            # Include TikTok user info if available
+            if tiktok_user:
+                emit_data["tiktokUser"] = tiktok_user
+            
             socketio.emit('word_found', emit_data, room='game')
             
             # Check if puzzle is completed

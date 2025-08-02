@@ -226,6 +226,7 @@ class GameInjector {
           
           // Always submit with the same player ID - the API might reject duplicates, but that's OK
           // We handle highlighting separately anyway
+          // Include TikTok user info so all players can see the real username
           await fetch('/api/submit-word', {
             method: 'POST',
             headers: {
@@ -234,7 +235,12 @@ class GameInjector {
             body: JSON.stringify({
               sessionId: gameData.sessionId,
               word: word,
-              playerId: basePlayerId
+              playerId: basePlayerId,
+              tiktokUser: {
+                username: user.username,
+                isTest: user.isTest,
+                avatar: user.avatar
+              }
             })
           });
         }

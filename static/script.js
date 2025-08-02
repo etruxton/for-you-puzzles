@@ -544,9 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success && currentSession) {
                 updateFoundWordsList(data.foundWords);
 
-                // Show notification - check if it comes from TikTok extension
+                // Show notification - check if it comes from TikTok (from server data or local extension)
                 if (data.word) {
-                    const tiktokInfo = tiktokSubmissions.get(data.word.toUpperCase());
+                    let tiktokInfo = data.tiktokUser || tiktokSubmissions.get(data.word.toUpperCase());
                     
                     console.log('Base game: Checking word', data.word.toUpperCase(), 'TikTok info:', tiktokInfo);
                     
@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // TikTok submission - show pink notification with TikTok info
                         console.log('Base game: Showing TikTok notification for', tiktokInfo.username);
                         showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
-                        // Clean up after use
+                        // Clean up local extension data after use
                         tiktokSubmissions.delete(data.word.toUpperCase());
                     } else {
                         // Regular submission - show purple notification
