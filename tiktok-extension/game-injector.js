@@ -416,6 +416,152 @@ class GameInjector {
     return `hsl(${hue}, 70%, 80%)`;
   }
   
+  generateAvatar(playerId) {
+    // Generate avatar using same logic as original game
+    let hash = 0;
+    for (let i = 0; i < playerId.length; i++) {
+      hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Generate colors from hash
+    const hue = Math.abs(hash) % 360;
+    const backgroundColor = `hsl(${hue}, 70%, 80%)`;
+    const accentColor = `hsl(${(hue + 180) % 360}, 60%, 50%)`;
+    
+    // Pick avatar style based on hash
+    const styleIndex = Math.abs(hash) % 8;
+    
+    let svg = '';
+    
+    switch(styleIndex) {
+      case 0: // Robot
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <rect x="7" y="7" width="10" height="10" rx="2" fill="#C0C0C0"/>
+            <rect x="5" y="10" width="3" height="1" fill="#808080"/>
+            <rect x="16" y="10" width="3" height="1" fill="#808080"/>
+            <circle cx="9" cy="10" r="1.5" fill="${accentColor}"/>
+            <circle cx="15" cy="10" r="1.5" fill="${accentColor}"/>
+            <rect x="9" y="13" width="6" height="1" fill="#666"/>
+          </svg>
+        `;
+        break;
+      
+      case 1: // Cat
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <ellipse cx="12" cy="13" rx="7" ry="6" fill="${accentColor}"/>
+            <path d="M5 7 L7 13 L9 9 Z" fill="${accentColor}"/>
+            <path d="M19 7 L17 13 L15 9 Z" fill="${accentColor}"/>
+            <circle cx="9" cy="12" r="1" fill="#000"/>
+            <circle cx="15" cy="12" r="1" fill="#000"/>
+            <path d="M12 14 L11 15 L12 16 L13 15 Z" fill="#FFB6C1"/>
+            <path d="M6 13 Q9 13, 9 15" fill="none" stroke="#000" stroke-width="0.5"/>
+            <path d="M18 13 Q15 13, 15 15" fill="none" stroke="#000" stroke-width="0.5"/>
+          </svg>
+        `;
+        break;
+      
+      case 2: // Alien
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <ellipse cx="12" cy="11" rx="6" ry="8" fill="#90EE90"/>
+            <circle cx="9" cy="10" r="2" fill="#000"/>
+            <circle cx="15" cy="10" r="2" fill="#000"/>
+            <circle cx="9" cy="10" r="0.5" fill="#FFF"/>
+            <circle cx="15" cy="10" r="0.5" fill="#FFF"/>
+            <ellipse cx="12" cy="15" rx="1" ry="2" fill="#444"/>
+            <circle cx="6" cy="6" r="1" fill="${accentColor}"/>
+            <circle cx="18" cy="6" r="1" fill="${accentColor}"/>
+            <line x1="6" y1="6" x2="8" y2="8" stroke="${accentColor}" stroke-width="0.5"/>
+            <line x1="18" y1="6" x2="16" y2="8" stroke="${accentColor}" stroke-width="0.5"/>
+          </svg>
+        `;
+        break;
+      
+      case 3: // Monster
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <circle cx="12" cy="12" r="8" fill="${accentColor}"/>
+            <circle cx="12" cy="9" r="3" fill="#FFF"/>
+            <circle cx="12" cy="9" r="2" fill="#000"/>
+            <path d="M8 15 Q10 13, 12 15 Q14 13, 16 15" fill="#FFF"/>
+            <path d="M8 4 L9 7 L10 4" fill="${accentColor}"/>
+            <path d="M12 4 L12 7" fill="${accentColor}"/>
+            <path d="M14 4 L15 7 L16 4" fill="${accentColor}"/>
+          </svg>
+        `;
+        break;
+      
+      case 4: // Bear
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <circle cx="8" cy="8" r="3" fill="#8B4513"/>
+            <circle cx="16" cy="8" r="3" fill="#8B4513"/>
+            <circle cx="12" cy="13" r="7" fill="#8B4513"/>
+            <circle cx="9" cy="12" r="1" fill="#000"/>
+            <circle cx="15" cy="12" r="1" fill="#000"/>
+            <ellipse cx="12" cy="15" rx="2" ry="1.5" fill="#000"/>
+            <circle cx="8" cy="8" r="1.5" fill="#D2691E"/>
+            <circle cx="16" cy="8" r="1.5" fill="#D2691E"/>
+          </svg>
+        `;
+        break;
+      
+      case 5: // Ghost
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <path d="M12 5 Q6 5, 6 12 L6 17 Q7 16, 8 17 Q9 16, 10 17 Q11 16, 12 17 Q13 16, 14 17 Q15 16, 16 17 Q17 16, 18 17 L18 12 Q18 5, 12 5" fill="#FFF"/>
+            <circle cx="9" cy="10" r="1.5" fill="#000"/>
+            <circle cx="15" cy="10" r="1.5" fill="#000"/>
+            <ellipse cx="12" cy="13" rx="1" ry="2" fill="#000" opacity="0.3"/>
+          </svg>
+        `;
+        break;
+      
+      case 6: // Octopus
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <ellipse cx="12" cy="10" rx="6" ry="7" fill="${accentColor}"/>
+            <circle cx="9" cy="9" r="1.5" fill="#FFF"/>
+            <circle cx="15" cy="9" r="1.5" fill="#FFF"/>
+            <circle cx="9" cy="9" r="0.8" fill="#000"/>
+            <circle cx="15" cy="9" r="0.8" fill="#000"/>
+            <path d="M8 15 Q8 18, 7 19 Q8 18, 8 15" fill="${accentColor}"/>
+            <path d="M10 15 Q10 18, 9 19 Q10 18, 10 15" fill="${accentColor}"/>
+            <path d="M12 15 Q12 18, 11 19 Q12 18, 12 15" fill="${accentColor}"/>
+            <path d="M14 15 Q14 18, 13 19 Q14 18, 14 15" fill="${accentColor}"/>
+            <path d="M16 15 Q16 18, 17 19 Q16 18, 16 15" fill="${accentColor}"/>
+          </svg>
+        `;
+        break;
+      
+      case 7: // Wizard
+        svg = `
+          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
+            <path d="M12 4 L7 12 L17 12 Z" fill="${accentColor}"/>
+            <circle cx="12" cy="7" r="1" fill="#FFD700"/>
+            <circle cx="12" cy="14" r="5" fill="#FFE4C4"/>
+            <circle cx="10" cy="13" r="0.8" fill="#000"/>
+            <circle cx="14" cy="13" r="0.8" fill="#000"/>
+            <path d="M7 17 Q12 22, 17 17" fill="#FFF" opacity="0.8"/>
+            <path d="M10 16 Q12 17, 14 16" fill="none" stroke="#000" stroke-width="0.5"/>
+          </svg>
+        `;
+        break;
+    }
+    
+    return 'data:image/svg+xml;base64,' + btoa(svg);
+  }
+  
   showWordFoundNotification(word, user) {
     // Create notification element
     const notification = document.createElement('div');
@@ -481,10 +627,28 @@ class GameInjector {
       document.body.appendChild(notification);
     }
     
-    const icon = user.isTest ? '🧪' : '🎵';
+    // Create avatar for the notification
+    const avatarSize = '24px';
+    let avatarHtml;
+    
+    if (user.avatar && !user.isTest) {
+      // Use TikTok profile picture if available
+      avatarHtml = `<img src="${user.avatar}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+    } else {
+      // Generate avatar using same logic as the game
+      const playerId = user.isTest ? `test_${user.username}` : `tiktok_${user.username}`;
+      const avatarSvg = this.generateAvatar(playerId);
+      avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+    }
+    
     notification.innerHTML = `
-      ${icon} <strong>${word}</strong><br>
-      <small>Found by ${user.username}</small>
+      <div style="display: flex; align-items: center; justify-content: center;">
+        ${avatarHtml}
+        <div>
+          <strong>${word}</strong><br>
+          <small>Found by ${user.username}</small>
+        </div>
+      </div>
     `;
     
     // Add animation keyframes if not already added

@@ -156,6 +156,17 @@ class TikTokBridge {
       return;
     }
     
+    // Safety filters for comment processing
+    if (!commentText || commentText.length > 10) {
+      console.log(`Skipping comment: too long (${commentText?.length} chars)`);
+      return;
+    }
+    
+    if (/\s/.test(commentText)) {
+      console.log('Skipping comment: contains whitespace');
+      return;
+    }
+    
     // Extract words from comment (3+ letters, alphabetic only)
     const words = commentText
       .replace(/[^\w\s]/g, ' ')

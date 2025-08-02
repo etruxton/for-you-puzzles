@@ -208,6 +208,17 @@ class PopupController {
       return;
     }
     
+    // Apply same safety filters as live comments
+    if (comment.length > 10) {
+      this.showError('Comment too long (max 10 characters)');
+      return;
+    }
+    
+    if (/\s/.test(comment)) {
+      this.showError('Comment cannot contain spaces');
+      return;
+    }
+    
     try {
       await chrome.runtime.sendMessage({
         type: 'SEND_TEST_COMMENT',
