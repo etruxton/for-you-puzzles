@@ -11,6 +11,8 @@
   "host_permissions": [
     "*://localhost:*/*",
     "*://127.0.0.1:*/*",
+    "*://foryoupuzzles.com/*",
+    "*://*.foryoupuzzles.com/*",
     "*://*.tiktok.com/*"
   ],
   "background": {
@@ -18,7 +20,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://localhost:*/*", "*://127.0.0.1:*/*"],
+      "matches": ["*://localhost:*/*", "*://127.0.0.1:*/*", "*://foryoupuzzles.com/*", "*://*.foryoupuzzles.com/*"],
       "js": ["game-injector.js"],
       "run_at": "document_end"
     },

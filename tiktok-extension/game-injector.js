@@ -45,9 +45,11 @@ class GameInjector {
   }
   
   isGamePage() {
-    // Check if we're on localhost or the game domain
+    // Check if we're on localhost, production site, or the game domain
     return window.location.hostname === 'localhost' || 
            window.location.hostname === '127.0.0.1' ||
+           window.location.hostname === 'foryoupuzzles.com' ||
+           window.location.hostname.endsWith('.foryoupuzzles.com') ||
            document.title.includes('For You Puzzles');
   }
   
