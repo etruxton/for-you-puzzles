@@ -42,8 +42,13 @@ class TikTokBridge {
           break;
           
         case 'CONNECT_TIKTOK':
-          const result = await this.connectToTikTok(message.username);
-          sendResponse(result);
+          try {
+            const result = await this.connectToTikTok(message.username);
+            sendResponse(result);
+          } catch (error) {
+            console.error('CONNECT_TIKTOK failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
           break;
           
         case 'DISCONNECT':
@@ -83,6 +88,15 @@ class TikTokBridge {
             await this.processComment(message.comment, message.user);
           }
           sendResponse({ success: true });
+          break;
+          
+        case 'RELOAD_TIKTOK_MONITOR':
+          if (this.tiktokTabId) {
+            const result = await this.ensureTikTokMonitorLoaded(this.tiktokTabId);
+            sendResponse({ success: true });
+          } else {
+            sendResponse({ success: false, error: 'No TikTok tab connected' });
+          }
           break;
           
         default:
@@ -130,6 +144,11 @@ class TikTokBridge {
       
       this.tiktokTabId = tiktokTab.id;
       this.isConnected = true;
+      
+      // Wait for tab to load, then force inject monitor script
+      setTimeout(async () => {
+        await this.ensureTikTokMonitorLoaded(tiktokTab.id);
+      }, 3000);
       
       await this.updateStatus();
       
@@ -255,6 +274,37 @@ class TikTokBridge {
     await this.updateStatus();
   }
   
+  async ensureTikTokMonitorLoaded(tabId) {
+    try {
+      console.log('Ensuring TikTok monitor is loaded in tab:', tabId);
+      
+      // Always inject the script - don't rely on PING which might fail
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          files: ['tiktok-monitor.js']
+        });
+        console.log('TikTok monitor script injected successfully');
+      } catch (injectError) {
+        console.error('Failed to inject TikTok monitor script:', injectError);
+        throw injectError;
+      }
+      
+      // Give it time to initialize and try to ping
+      setTimeout(async () => {
+        try {
+          const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+          console.log('TikTok monitor responding:', response);
+        } catch (error) {
+          console.log('TikTok monitor not responding to ping, but script was injected');
+        }
+      }, 2000); // Increased timeout
+      
+    } catch (error) {
+      console.error('Failed to ensure TikTok monitor loaded:', error);
+    }
+  }
+
   async recheckGameTab() {
     console.log('Rechecking for game tabs...');
     

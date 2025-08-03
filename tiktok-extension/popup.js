@@ -44,6 +44,7 @@ class PopupController {
     
     // Other buttons
     this.refreshBtn = document.getElementById('refresh-btn');
+    this.reloadMonitorBtn = document.getElementById('reload-monitor-btn');
     this.helpBtn = document.getElementById('help-btn');
   }
   
@@ -77,6 +78,11 @@ class PopupController {
     // Refresh button
     this.refreshBtn.addEventListener('click', () => {
       this.loadStatus();
+    });
+    
+    // Reload monitor button
+    this.reloadMonitorBtn.addEventListener('click', () => {
+      this.reloadTikTokMonitor();
     });
     
     // Help button
@@ -298,6 +304,27 @@ class PopupController {
     }, 3000);
   }
   
+  async reloadTikTokMonitor() {
+    try {
+      this.reloadMonitorBtn.disabled = true;
+      this.reloadMonitorBtn.textContent = 'Reloading...';
+      
+      const response = await chrome.runtime.sendMessage({ type: 'RELOAD_TIKTOK_MONITOR' });
+      
+      if (response.success) {
+        this.showSuccess('TikTok monitor reloaded successfully!');
+      } else {
+        this.showError(response.error || 'Failed to reload monitor');
+      }
+    } catch (error) {
+      this.showError('Failed to reload monitor: ' + error.message);
+    } finally {
+      this.reloadMonitorBtn.disabled = false;
+      this.reloadMonitorBtn.textContent = 'Reload Monitor';
+      this.loadStatus();
+    }
+  }
+
   showHelp() {
     const helpText = `
 TikTok Word Search Bridge Help:
@@ -316,6 +343,7 @@ Test Mode:
 Troubleshooting:
 - Make sure both tabs are open (game and TikTok)
 - Refresh this popup if connection seems stuck
+- Click "Reload Monitor" if TikTok comments aren't working
 - The game tab should show "Connected" status
 
 Note: This extension monitors TikTok comments and submits valid words to your game automatically.

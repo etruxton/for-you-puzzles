@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // TikTok extension integration
     const tiktokSubmissions = new Map();
+    const tiktokUsersByPlayerId = new Map(); // Store TikTok user info by player ID
     
     // Listen for TikTok word submissions
     window.addEventListener('tiktokWordSubmitted', (event) => {
@@ -541,17 +542,41 @@ document.addEventListener('DOMContentLoaded', () => {
         
         socket.on('word_found', (data) => {
             if (data.success && currentSession) {
-                updateFoundWordsList(data.foundWords);
-
-                // Show notification - check if it comes from TikTok (from server data or local extension)
+                // FIRST: Store TikTok user info BEFORE updating word lists
                 if (data.word) {
                     let tiktokInfo = data.tiktokUser || tiktokSubmissions.get(data.word.toUpperCase());
                     
                     if (tiktokInfo) {
-                        // TikTok submission - show pink notification with TikTok info
-                        showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
+                        // Store TikTok user info for later use in word lists
+                        // Store with the actual foundBy ID that comes from the server
+                        tiktokUsersByPlayerId.set(data.foundBy, tiktokInfo);
+                        
+                        // Also store with potential variations to handle ID format differences
+                        const baseUsername = tiktokInfo.username.replace(/\s+/g, '_');
+                        const altPlayerId1 = `tiktok_${tiktokInfo.username}`;
+                        const altPlayerId2 = `tiktok_${baseUsername}`;
+                        
+                        tiktokUsersByPlayerId.set(altPlayerId1, tiktokInfo);
+                        tiktokUsersByPlayerId.set(altPlayerId2, tiktokInfo);
+                        
+                        console.log('TIKTOK STORAGE DEBUG - Stored user info for player:', data.foundBy, tiktokInfo);
+                        console.log('TIKTOK STORAGE DEBUG - Also stored for:', altPlayerId1, altPlayerId2);
+                        
                         // Clean up local extension data after use
                         tiktokSubmissions.delete(data.word.toUpperCase());
+                    }
+                }
+
+                // SECOND: Update word lists (now that TikTok info is stored)
+                updateFoundWordsList(data.foundWords);
+
+                // THIRD: Show notification
+                if (data.word) {
+                    let tiktokInfo = data.tiktokUser || tiktokUsersByPlayerId.get(data.foundBy);
+                    
+                    if (tiktokInfo) {
+                        // TikTok submission - show pink notification with TikTok info
+                        showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
                     } else {
                         // Regular submission - show purple notification
                         const isCurrentPlayer = data.foundBy === playerId;
@@ -718,17 +743,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayFoundWords(foundWords) {
+        console.log('DISPLAY WORDS DEBUG - Function called with', foundWords.length, 'words');
         foundWordsList.innerHTML = '';
         bonusWordsList.innerHTML = '';
         
         foundWords.forEach(fw => {
             const li = document.createElement('li');
 
-            // Create avatar img
+            // Create avatar img - EXACT SAME LOGIC AS NOTIFICATION
             const avatar = document.createElement('img');
-            avatar.src = getAvatar(fw.foundBy);
+            
+            // Check if this word came from TikTok - look up tiktokInfo the same way notifications do
+            let tiktokInfo = null;
+            
+            // Search all stored TikTok users to find one matching this foundBy ID
+            for (const [storedPlayerId, storedInfo] of tiktokUsersByPlayerId.entries()) {
+                if (storedPlayerId === fw.foundBy || 
+                    storedPlayerId.includes(storedInfo.username) && fw.foundBy.includes(storedInfo.username)) {
+                    tiktokInfo = storedInfo;
+                    break;
+                }
+            }
+            
+            console.log('WORDS LIST DEBUG - Player ID:', fw.foundBy);
+            console.log('WORDS LIST DEBUG - TikTok info found:', tiktokInfo);
+            
+            // Use EXACT same avatar logic as notifications
+            if (tiktokInfo && tiktokInfo.avatar && !tiktokInfo.isTest) {
+                // Use TikTok profile picture
+                avatar.src = tiktokInfo.avatar;
+                avatar.title = tiktokInfo.username;
+                console.log('WORDS LIST DEBUG - Using TikTok avatar:', tiktokInfo.avatar.slice(0, 50));
+            } else if (tiktokInfo && tiktokInfo.isTest) {
+                // Generate avatar for test user
+                const playerId = `test_${tiktokInfo.username}`;
+                avatar.src = getAvatar(playerId);
+                avatar.title = tiktokInfo.username;
+                console.log('WORDS LIST DEBUG - Using test avatar for:', tiktokInfo.username);
+            } else {
+                // Use generated avatar for non-TikTok users
+                avatar.src = getAvatar(fw.foundBy);
+                avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
+                console.log('WORDS LIST DEBUG - Using generated avatar for:', fw.foundBy);
+            }
+            
             avatar.className = 'player-avatar';
-            avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
             
             // Create word span
             const wordSpan = document.createElement('span');
