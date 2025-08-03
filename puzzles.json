@@ -135,11 +135,6 @@
     "words": ["CIRCLE", "SQUARE", "TRIANGLE", "STAR", "DIAMOND", "RED", "BLUE", "GREEN", "YELLOW", "PURPLE", "ORANGE", "OVAL"]
   },
   {
-    "puzzleId": "HOLIDAYS",
-    "category": "Holidays",
-    "words": ["CHRISTMAS", "HALLOWEEN", "CELEBRATE", "EASTER", "NEWYEAR", "VALENTINE", "PARADE", "GIFT", "CANDY"]
-  },
-  {
     "puzzleId": "FIRE_DEPARTMENT",
     "category": "Fire Department",
     "words": ["FIRETRUCK", "LADDER", "HOSE", "HYDRANT", "SIREN", "AXE", "HELMET", "STATION", "ALARM", "RESCUE", "SMOKE"]
