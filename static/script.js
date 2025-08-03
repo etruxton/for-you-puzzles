@@ -321,15 +321,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${sideProperty}: 15px;
                 background: ${bgColor};
                 color: white;
-                padding: 8px 12px;
+                padding: ${window.innerWidth < 480 ? '6px 8px' : '8px 12px'};
                 margin: 10px;
                 border-radius: 15px;
-                font-size: 13px;
+                font-size: ${window.innerWidth < 480 ? '11px' : '13px'};
                 font-weight: bold;
                 z-index: 1000;
                 box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
                 animation: ${animationName} 0.3s ease-out;
-                max-width: 150px;
+                max-width: ${window.innerWidth < 480 ? '120px' : '150px'};
                 text-align: center;
                 font-family: Arial, sans-serif;
                 pointer-events: none;
@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Create avatar for the notification
-        const avatarSize = '24px';
+        const avatarSize = window.innerWidth < 480 ? '20px' : '24px';
         let avatarHtml;
         let displayName;
         
