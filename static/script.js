@@ -21,6 +21,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyCelebrationBtn = document.getElementById('copy-celebration-emoji');
     const copySummaryBtn = document.getElementById('copy-summary-emoji');
     
+    // --- Dictionary (bloom filter) ---
+    let bloomFilter = null;
+    let bloomBits = 0;
+    let bloomHashes = 0;
+    fetch('/dictionary.bin')
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+            const view = new DataView(buf);
+            bloomBits = view.getUint32(0, true);
+            bloomHashes = view.getUint32(4, true);
+            bloomFilter = new Uint8Array(buf, 12);
+        });
+
+    function fnv1a(str) {
+        let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+        }
+        return h >>> 0;
+    }
+
+    function djb2(str) {
+        let h = 5381;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+        }
+        return h >>> 0;
+    }
+
+    function isWord(word) {
+        if (!bloomFilter) return true;
+        const h1 = fnv1a(word);
+        const h2 = djb2(word);
+        for (let i = 0; i < bloomHashes; i++) {
+            const bit = ((h1 + Math.imul(i, h2)) >>> 0) % bloomBits;
+            if (!(bloomFilter[bit >> 3] & (1 << (bit & 7)))) return false;
+        }
+        return true;
+    }
+
     // --- Game State ---
     const gridSize = 10;
     let gridData = [];
@@ -711,6 +752,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function processGuess(word) {
         word = word.toUpperCase().trim();
         if (word.length < 3 || !currentSession) return;
+
+        if (!isWord(word)) {
+            shakeInput();
+            return;
+        }
 
         const path = findWordOnGrid(word);
         if (!path) {

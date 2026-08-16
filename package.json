@@ -2,6 +2,7 @@
   "name": "for-you-puzzles",
   "private": true,
   "scripts": {
+    "build:dictionary": "node scripts/build-bloom.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
