@@ -1,8 +1,8 @@
 import { PUZZLES } from './puzzles.js';
 
-const GRID_SIZE = 10;
+export const GRID_SIZE = 10;
 const LETTER_POOL = "EEEEEEEEAAAAAIIIIIOOOOONNNNNRRRRRTTTTTLLLLSSSSUUUUDDGGGBBCCMMPPFFHHVVWWYYKJXQZ";
-const DIRECTIONS = [
+export const DIRECTIONS = [
   [0,1],[0,-1],[1,0],[-1,0],
   [1,1],[-1,-1],[1,-1],[-1,1]
 ];
@@ -46,7 +46,7 @@ function checkWordAtPosition(grid, word, row, col, dr, dc) {
   return true;
 }
 
-function wordExistsInGrid(grid, word) {
+export function wordExistsInGrid(grid, word) {
   const rev = word.split('').reverse().join('');
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
@@ -59,7 +59,7 @@ function wordExistsInGrid(grid, word) {
   return false;
 }
 
-function generateGrid(words) {
+export function generateGrid(words) {
   for (let attempt = 0; attempt < 50; attempt++) {
     const grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
     const wordPositions = {};
@@ -114,7 +114,7 @@ function generateEmojiGrid(words, wordPositions, foundWords) {
 }
 
 export class GameRoom {
-  constructor(state, env) {
+  constructor(state, _env) {
     this.state = state;
     this.sessions = new Set();
     this.game = null;

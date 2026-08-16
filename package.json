@@ -1,12 +1,21 @@
 {
   "name": "for-you-puzzles",
   "private": true,
+  "type": "module",
   "scripts": {
     "build:dictionary": "node scripts/build-bloom.js",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ scripts/",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "husky": "^9.1.7",
+    "vitest": "^2.1.9",
     "wrangler": "^4.0.0"
   }
 }

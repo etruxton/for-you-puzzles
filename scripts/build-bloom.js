@@ -1,10 +1,18 @@
-const fs = require('fs');
-const path = require('path');
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const words = fs.readFileSync(path.join(__dirname, 'words.txt'), 'utf-8')
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const dictWords = readFileSync(join(__dirname, 'words.txt'), 'utf-8')
   .split('\n')
   .map(w => w.trim().toUpperCase())
   .filter(w => w.length >= 3 && w.length <= 10);
+
+const puzzlesFile = readFileSync(join(__dirname, '..', 'src', 'puzzles.js'), 'utf-8');
+const puzzleWords = [...puzzlesFile.matchAll(/"([A-Z]+)"/g)].map(m => m[1]).filter(w => w.length >= 3);
+
+const words = [...new Set([...dictWords, ...puzzleWords])];
 
 const n = words.length;
 const bitsPerElement = 10;
@@ -55,7 +63,7 @@ header.writeUInt32LE(numHashes, 4);
 header.writeUInt32LE(words.length, 8);
 
 const out = Buffer.concat([header, buffer]);
-fs.writeFileSync(path.join(__dirname, '..', 'static', 'dictionary.bin'), out);
+writeFileSync(join(__dirname, '..', 'static', 'dictionary.bin'), out);
 
 console.log(`Built bloom filter: ${words.length} words, ${numBits} bits (${(out.length / 1024).toFixed(1)}KB), ${numHashes} hashes`);
 
