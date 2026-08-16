@@ -54,16 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notification system state
     let notificationSide = 'right'; // Track which side for alternating notifications
     
-    // TikTok extension integration
-    const tiktokSubmissions = new Map();
-    const tiktokUsersByPlayerId = new Map(); // Store TikTok user info by player ID
-    
-    // Listen for TikTok word submissions
-    window.addEventListener('tiktokWordSubmitted', (event) => {
-        const tiktokInfo = event.detail;
-        tiktokSubmissions.set(tiktokInfo.word, tiktokInfo);
-    });
-
     // --- Username Generation ---
     function generateRandomUsername() {
         const adjectives = [
@@ -294,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Notification System ---
-    function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null, tiktokInfo = null) {
+    function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null) {
         
         // Create notification element
         const notification = document.createElement('div');
@@ -309,10 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sideProperty = isRightSide ? 'right' : 'left';
             const animationName = isRightSide ? 'slideInFromRight' : 'slideInFromLeft';
             
-            // Pink for TikTok, Purple for base game
-            const bgColor = tiktokInfo ? 
-                'linear-gradient(135deg, #ff0050 0%, #ff4d8f 100%)' : 
-                'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
+            const bgColor = 'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
             
             notification.style.cssText = `
                 position: absolute;
@@ -369,42 +356,28 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(notification);
         }
         
-        // Create avatar for the notification
         const avatarSize = window.innerWidth < 480 ? '20px' : '24px';
-        let avatarHtml;
-        let displayName;
+        const avatarPlayerId = foundByPlayerId || playerId;
+        const avatarSvg = generateAvatar(avatarPlayerId);
+        const avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
+        const displayName = isCurrentPlayer ? playerUsername : username;
         
-        if (tiktokInfo) {
-            // Use TikTok info
-            displayName = tiktokInfo.username;
-            if (tiktokInfo.avatar && !tiktokInfo.isTest) {
-                // Use TikTok profile picture if available
-                avatarHtml = `<img src="${tiktokInfo.avatar}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
-            } else {
-                // Generate avatar for test users or when no TikTok avatar
-                const basePlayerId = tiktokInfo.isTest ? 
-                    `test_${tiktokInfo.username}` : 
-                    `tiktok_${tiktokInfo.username}`;
-                const avatarSvg = generateAvatar(basePlayerId);
-                avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
-            }
-        } else {
-            // Use regular game info
-            const avatarPlayerId = foundByPlayerId || playerId;
-            const avatarSvg = generateAvatar(avatarPlayerId);
-            avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
-            displayName = isCurrentPlayer ? playerUsername : username;
-        }
-        
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center;">
-                ${avatarHtml}
-                <div>
-                    <strong>${word}</strong><br>
-                    <small>Found by ${displayName}</small>
-                </div>
-            </div>
-        `;
+        const notifContainer = document.createElement('div');
+        notifContainer.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+        const avatarImg = document.createElement('img');
+        avatarImg.src = avatarSvg;
+        avatarImg.style.cssText = `width:${avatarSize};height:${avatarSize};border-radius:50%;margin-right:8px;`;
+        const textDiv = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = word;
+        const small = document.createElement('small');
+        small.textContent = 'Found by ' + displayName;
+        textDiv.appendChild(strong);
+        textDiv.appendChild(document.createElement('br'));
+        textDiv.appendChild(small);
+        notifContainer.appendChild(avatarImg);
+        notifContainer.appendChild(textDiv);
+        notification.appendChild(notifContainer);
         
         // Add animation keyframes if not already added
         if (!document.getElementById('base-game-animations')) {
@@ -495,159 +468,89 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // --- Socket.IO Connection ---
+    // --- WebSocket Connection ---
+    let pendingGame = null;
+    let reconnectDelay = 1000;
+
     function connectSocket() {
-        // Use relative path for Socket.IO to work on both local and Heroku
-        const socketUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:5000' 
-            : window.location.origin;
-            
-        socket = io(socketUrl, {
-            transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
-            upgrade: true
-        });
-        
-        socket.on('connect', () => {
+        const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProto}//${window.location.host}/api/ws`;
+
+        socket = new WebSocket(wsUrl);
+
+        socket.addEventListener('open', () => {
             console.log('Connected to server');
-            // Request current game state when connected
-            socket.emit('request_current_game');
+            reconnectDelay = 1000;
+            socket.send(JSON.stringify({ type: 'request_current_game' }));
         });
-        
-        socket.on('current_game', (gameData) => {
-            console.log('Received current game');
-            if (gameData) {
-                loadGameSession(gameData);
+
+        socket.addEventListener('message', (event) => {
+            const msg = JSON.parse(event.data);
+            console.log('[DEBUG] Received:', msg.type);
+
+            if (msg.type === 'current_game') {
+                if (msg.data) loadGameSession(msg.data);
             }
-        });
-        
-        socket.on('new_game', (gameData) => {
-            console.log('New game started');
-            
-            // Check if we're in the middle of a celebration or summary screen
-            const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
-            const summaryVisible = !summaryOverlay.classList.contains('hidden');
-            
-            console.log('Celebration visible:', celebrationVisible, 'Summary visible:', summaryVisible);
-            
-            if (celebrationVisible || summaryVisible) {
-                // Store the new game data to load after the countdown
-                console.log('Storing game for later load after countdown');
-                socket._pendingGame = gameData;
-            } else {
-                // Load immediately if no overlay is showing
-                console.log('Loading game immediately');
-                loadGameSession(gameData);
-            }
-        });
-        
-        socket.on('word_found', (data) => {
-            if (data.success && currentSession) {
-                // FIRST: Store TikTok user info BEFORE updating word lists
-                if (data.word) {
-                    let tiktokInfo = data.tiktokUser || tiktokSubmissions.get(data.word.toUpperCase());
-                    
-                    if (tiktokInfo) {
-                        // Store TikTok user info for later use in word lists
-                        // Store with the actual foundBy ID that comes from the server
-                        tiktokUsersByPlayerId.set(data.foundBy, tiktokInfo);
-                        
-                        // Also store with potential variations to handle ID format differences
-                        const baseUsername = tiktokInfo.username.replace(/\s+/g, '_');
-                        const altPlayerId1 = `tiktok_${tiktokInfo.username}`;
-                        const altPlayerId2 = `tiktok_${baseUsername}`;
-                        
-                        tiktokUsersByPlayerId.set(altPlayerId1, tiktokInfo);
-                        tiktokUsersByPlayerId.set(altPlayerId2, tiktokInfo);
-                        
-                        console.log('TIKTOK STORAGE DEBUG - Stored user info for player:', data.foundBy, tiktokInfo);
-                        console.log('TIKTOK STORAGE DEBUG - Also stored for:', altPlayerId1, altPlayerId2);
-                        
-                        // Clean up local extension data after use
-                        tiktokSubmissions.delete(data.word.toUpperCase());
-                    }
+
+            else if (msg.type === 'new_game') {
+                const celebrationVisible = !celebrationOverlay.classList.contains('hidden');
+                const summaryVisible = !summaryOverlay.classList.contains('hidden');
+                if (celebrationVisible || summaryVisible) {
+                    pendingGame = msg.data;
+                } else {
+                    loadGameSession(msg.data);
                 }
+            }
 
-                // SECOND: Update word lists (now that TikTok info is stored)
-                updateFoundWordsList(data.foundWords);
-
-                // THIRD: Show notification
-                if (data.word) {
-                    let tiktokInfo = data.tiktokUser || tiktokUsersByPlayerId.get(data.foundBy);
-                    
-                    if (tiktokInfo) {
-                        // TikTok submission - show pink notification with TikTok info
-                        showWordFoundNotification(data.word, tiktokInfo.username, false, data.foundBy, tiktokInfo);
-                    } else {
-                        // Regular submission - show purple notification
+            else if (msg.type === 'word_found') {
+                const data = msg.data;
+                if (data.success && currentSession) {
+                    updateFoundWordsList(data.foundWords);
+                    if (data.word) {
                         const isCurrentPlayer = data.foundBy === playerId;
                         let username;
                         if (isCurrentPlayer) {
                             username = playerUsername;
                         } else {
-                            // Generate consistent username for other players
                             if (!usernameCache[data.foundBy]) {
                                 usernameCache[data.foundBy] = generateUsernameFromPlayerId(data.foundBy);
                             }
                             username = usernameCache[data.foundBy];
                         }
-                        showWordFoundNotification(data.word, username, isCurrentPlayer, data.foundBy, null);
+                        showWordFoundNotification(data.word, username, isCurrentPlayer, data.foundBy);
+                    }
+                    if (data.foundBy && data.foundBy !== playerId && data.word) {
+                        const path = findWordOnGrid(data.word);
+                        if (path) highlightPath(path, data.foundBy);
                     }
                 }
+            }
 
-                // Highlight the word on the grid if someone else found it
-                if (data.foundBy && data.foundBy !== playerId && data.word) {
-                    const path = findWordOnGrid(data.word);
-                    if (path) {
-                        highlightPath(path, data.foundBy); // Pass the player ID who found it
-                    }
+            else if (msg.type === 'puzzle_completed') {
+                if (msg.data.emojiGrid) gameEmojiGrid = msg.data.emojiGrid;
+                celebratePuzzleCompletion();
+            }
+
+            else if (msg.type === 'game_timeout') {
+                if (msg.data.emojiGrid) gameEmojiGrid = msg.data.emojiGrid;
+                else gameEmojiGrid = null;
+                if (msg.data.missedWords && currentSession) currentSession.missedWords = msg.data.missedWords;
+                if (currentSession && currentSession.status === 'ACTIVE') {
+                    currentSession.status = 'EXPIRED';
+                    showSummaryScreen();
                 }
             }
         });
-        
-        socket.on('puzzle_completed', (data) => {
-            console.log('Puzzle completed:', data.message);
-            // Store the emoji grid
-            if (data.emojiGrid) {
-                gameEmojiGrid = data.emojiGrid;
-            }
-            // Show the celebration screen
-            celebratePuzzleCompletion();
+
+        socket.addEventListener('error', () => {
+            console.error('WebSocket error');
         });
-        
-        socket.on('game_timeout', (data) => {
-            console.log('Game timed out:', data.message);
-            // Store the emoji grid and missed words
-            if (data.emojiGrid) {
-                gameEmojiGrid = data.emojiGrid;
-            } else {
-                gameEmojiGrid = null;
-            }
-            
-            // Store missed words for the summary screen
-            if (data.missedWords) {
-                currentSession.missedWords = data.missedWords;
-            }
-            
-            // Show the summary screen when game times out
-            if (currentSession && currentSession.status === 'ACTIVE') {
-                currentSession.status = 'EXPIRED';
-                showSummaryScreen();
-            }
-        });
-        
-        // Listen for any socket event for debugging
-        socket.onAny((eventName, ...args) => {
-            console.log(`[DEBUG] Received event: ${eventName}`, args);
-        });
-        
-        socket.on('connect_error', (error) => {
-            console.error('Connection error:', error.message);
-            gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Connection error. Please refresh the page.</p>';
-        });
-        
-        socket.on('disconnect', () => {
+
+        socket.addEventListener('close', () => {
             console.log('Disconnected from server');
-            gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Disconnected. Attempting to reconnect...</p>';
+            gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Disconnected. Reconnecting...</p>';
+            setTimeout(connectSocket, reconnectDelay);
+            reconnectDelay = Math.min(reconnectDelay * 2, 30000);
         });
     }
 
@@ -670,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadGameSession(gameData) {
         currentSession = gameData;
-        originalWords = new Set(); // We no longer know the words in advance
+        originalWords = new Set();
         gridData = gameData.gridData;
         
         // Reset found words tracking
@@ -730,16 +633,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function moveWordToTop(word) {
-        // Find the word in either list
-        const foundWordItem = foundWordsList.querySelector(`li[data-word="${word}"]`);
-        const bonusWordItem = bonusWordsList.querySelector(`li[data-word="${word}"]`);
-        
-        if (foundWordItem) {
-            foundWordsList.prepend(foundWordItem);
-        } else if (bonusWordItem) {
-            bonusWordsList.prepend(bonusWordItem);
+    function findListItemByWord(list, word) {
+        for (const li of list.children) {
+            if (li.dataset.word === word) return li;
         }
+        return null;
+    }
+
+    function moveWordToTop(word) {
+        const foundWordItem = findListItemByWord(foundWordsList, word);
+        const bonusWordItem = findListItemByWord(bonusWordsList, word);
+        if (foundWordItem) foundWordsList.prepend(foundWordItem);
+        else if (bonusWordItem) bonusWordsList.prepend(bonusWordItem);
     }
 
     function displayFoundWords(foundWords) {
@@ -749,43 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         foundWords.forEach(fw => {
             const li = document.createElement('li');
-
-            // Create avatar img - EXACT SAME LOGIC AS NOTIFICATION
             const avatar = document.createElement('img');
-            
-            // Check if this word came from TikTok - look up tiktokInfo the same way notifications do
-            let tiktokInfo = null;
-            
-            // Search all stored TikTok users to find one matching this foundBy ID
-            for (const [storedPlayerId, storedInfo] of tiktokUsersByPlayerId.entries()) {
-                if (storedPlayerId === fw.foundBy || 
-                    storedPlayerId.includes(storedInfo.username) && fw.foundBy.includes(storedInfo.username)) {
-                    tiktokInfo = storedInfo;
-                    break;
-                }
-            }
-            
-            console.log('WORDS LIST DEBUG - Player ID:', fw.foundBy);
-            console.log('WORDS LIST DEBUG - TikTok info found:', tiktokInfo);
-            
-            // Use EXACT same avatar logic as notifications
-            if (tiktokInfo && tiktokInfo.avatar && !tiktokInfo.isTest) {
-                // Use TikTok profile picture
-                avatar.src = tiktokInfo.avatar;
-                avatar.title = tiktokInfo.username;
-                console.log('WORDS LIST DEBUG - Using TikTok avatar:', tiktokInfo.avatar.slice(0, 50));
-            } else if (tiktokInfo && tiktokInfo.isTest) {
-                // Generate avatar for test user
-                const playerId = `test_${tiktokInfo.username}`;
-                avatar.src = getAvatar(playerId);
-                avatar.title = tiktokInfo.username;
-                console.log('WORDS LIST DEBUG - Using test avatar for:', tiktokInfo.username);
-            } else {
-                // Use generated avatar for non-TikTok users
-                avatar.src = getAvatar(fw.foundBy);
-                avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
-                console.log('WORDS LIST DEBUG - Using generated avatar for:', fw.foundBy);
-            }
+            avatar.src = getAvatar(fw.foundBy);
+            avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
             
             avatar.className = 'player-avatar';
             
@@ -830,50 +701,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Word Processing ---
-    async function processGuess(word) {
+    function shakeInput() {
+        wordInput.classList.remove('invalid');
+        void wordInput.offsetWidth;
+        wordInput.classList.add('invalid');
+        setTimeout(() => wordInput.classList.remove('invalid'), 400);
+    }
+
+    function processGuess(word) {
         word = word.toUpperCase().trim();
         if (word.length < 3 || !currentSession) return;
 
         const path = findWordOnGrid(word);
-        if (!path) return;
-
-        // Check if already found locally
-        if (allFoundWords.has(word)) {
-            // Find who originally found this word
-            const foundWordItem = foundWordsList.querySelector(`li[data-word="${word}"]`) || 
-                                 bonusWordsList.querySelector(`li[data-word="${word}"]`);
-            const originalFinder = foundWordItem ? foundWordItem.dataset.foundBy : playerId;
-            
-            highlightPath(path, originalFinder);
-            moveWordToTop(word);  // Move the word to the top
-            wordInput.value = '';
+        if (!path) {
+            shakeInput();
             return;
         }
 
-        // Verify it's a real word
-        const isValid = await isRealWord(word);
-        if (!isValid) return;
+        wordInput.value = '';
 
-        // Submit to server
-        try {
-            const response = await fetch(`${SERVER_URL}/api/submit-word`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: currentSession.sessionId,
-                    word: word,
-                    playerId: playerId
-                })
-            });
+        if (allFoundWords.has(word)) {
+            const foundWordItem = findListItemByWord(foundWordsList, word) || findListItemByWord(bonusWordsList, word);
+            const originalFinder = foundWordItem ? foundWordItem.dataset.foundBy : playerId;
+            highlightPath(path, originalFinder);
+            moveWordToTop(word);
+            return;
+        }
 
-            const result = await response.json();
-            
-            if (result.success || result.alreadyFound) {
-                highlightPath(path, playerId); // Highlight with your own color
-                wordInput.value = '';
-            }
-        } catch (error) {
-            console.error('Error submitting word:', error);
+        highlightPath(path, playerId);
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'submit_word', data: { word, playerId } }));
         }
     }
 
@@ -927,17 +784,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.style.color = '';
             });
         }, 1500);
-    }
-
-    async function isRealWord(word) {
-        if (word.length < 3) return false;
-        try {
-            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-            return response.ok;
-        } catch (error) {
-            console.error("Dictionary API error:", error);
-            return false;
-        }
     }
 
     // --- Timer Management ---
@@ -1044,9 +890,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 celebrationOverlay.classList.add('hidden');
                 
                 // Load pending game if there is one
-                if (socket._pendingGame) {
-                    loadGameSession(socket._pendingGame);
-                    socket._pendingGame = null;
+                if (pendingGame) {
+                    loadGameSession(pendingGame);
+                    pendingGame = null;
                 } else {
                     // Poll for new game multiple times
                     console.log('[DEBUG] No pending game after celebration, starting poll for new game');
@@ -1142,9 +988,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 summaryOverlay.classList.add('hidden');
                 
                 // Load pending game if there is one
-                if (socket._pendingGame) {
-                    loadGameSession(socket._pendingGame);
-                    socket._pendingGame = null;
+                if (pendingGame) {
+                    loadGameSession(pendingGame);
+                    pendingGame = null;
                 } else {
                     // Poll for new game multiple times
                     console.log('[DEBUG] No pending game after celebration, starting poll for new game');
@@ -1181,6 +1027,8 @@ document.addEventListener('DOMContentLoaded', () => {
             processGuess(wordInput.value);
         }
     });
+
+    wordInput.focus();
 
     // --- Copy Button Functionality ---
     function setupCopyButton(button, getTextFunc) {

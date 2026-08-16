@@ -622,6 +622,19 @@ h1, h2 {
     border: 1px solid #444;
     border-radius: 5px;
     color: white;
+    transition: border-color 0.2s;
+}
+
+#word-input.invalid {
+    border-color: #e74c3c;
+    animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
 }
 
 #word-lists-container {

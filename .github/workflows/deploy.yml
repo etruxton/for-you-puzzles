@@ -1,39 +1,27 @@
-name: Deploy S3 Website and Invalidate CloudFront
+name: Deploy to Cloudflare Workers
 
 on:
   push:
     branches:
-      - main # Trigger this workflow on pushes to the 'main' branch
+      - main
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest # The runner environment
-
-    # Permissions for OIDC (if you're using Option A)
-    permissions:
-      id-token: write # Required for OIDC authentication
-      contents: read  # Required to checkout the repository code
-
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 # Action to check out your code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      # Configure AWS credentials
-      - name: Configure AWS Credentials with OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Deploy to S3
-        run: |
-          aws s3 sync . s3://${{ secrets.AWS_S3_BUCKET }} --delete
-          # If your static files are in a 'build' or 'dist' folder:
-          # aws s3 sync ./build s3://${{ secrets.AWS_S3_BUCKET }} --delete
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }} # Ensure region is set for aws cli
+          node-version: '24'
 
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+      - name: Install dependencies
+        run: npm install
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
         env:
-          AWS_REGION: ${{ secrets.AWS_REGION }} # Ensure region is set for aws cli
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

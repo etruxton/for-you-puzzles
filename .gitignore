@@ -1,13 +1,8 @@
-# Python
-.venv/
-venv/
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
+# Dependencies
+node_modules/
+
+# Wrangler
+.wrangler/
 
 # IDE
 .vscode/
