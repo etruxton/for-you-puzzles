@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Configuration ---
-    const SERVER_URL = window.location.origin; // Automatically uses the same origin
-    
-    // --- DOM Elements ---
+    const SERVER_URL = window.location.origin;
+
     const gridContainer = document.getElementById('grid-container');
     const wordInput = document.getElementById('word-input');
     const puzzleTitle = document.getElementById('puzzle-title');
@@ -20,8 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryEmojiGrid = document.getElementById('summary-emoji-grid');
     const copyCelebrationBtn = document.getElementById('copy-celebration-emoji');
     const copySummaryBtn = document.getElementById('copy-summary-emoji');
-    
-    // --- Dictionary (bloom filter) ---
+
     let bloomFilter = null;
     let bloomBits = 0;
     let bloomHashes = 0;
@@ -62,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    // --- Game State ---
     const gridSize = 10;
     let gridData = [];
     let tileElements = [];
@@ -76,26 +72,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let socket = null;
     let gameEmojiGrid = null;
     let puzzleCompletionTime = null;
-    
+
     const directions = [
         { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
         { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
     ];
 
-    // Generate or retrieve player ID
     let playerId = localStorage.getItem('playerId');
     if (!playerId) {
         playerId = 'player-' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('playerId', playerId);
     }
 
-    // Player username will be generated after the function is defined
     let playerUsername = localStorage.getItem('playerUsername');
+    let notificationSide = 'right';
 
-    // Notification system state
-    let notificationSide = 'right'; // Track which side for alternating notifications
-    
-    // --- Username Generation ---
     function generateRandomUsername() {
         const adjectives = [
             'Swift', 'Clever', 'Bright', 'Quick', 'Sharp', 'Wise', 'Bold', 'Cool',
@@ -103,22 +94,21 @@ document.addEventListener('DOMContentLoaded', () => {
             'Dark', 'Soft', 'Deep', 'High', 'Rich', 'Warm', 'Cold', 'Loud',
             'Quiet', 'Strong', 'Light', 'Heavy', 'Smooth', 'Rough', 'Fresh', 'Sweet'
         ];
-        
+
         const nouns = [
             'Wizard', 'Phoenix', 'Dragon', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear',
             'Hawk', 'Lion', 'Shark', 'Falcon', 'Raven', 'Lynx', 'Panther', 'Viper',
             'Storm', 'Flame', 'Shadow', 'Blade', 'Arrow', 'Star', 'Moon', 'Sun',
             'Ocean', 'Thunder', 'Lightning', 'Wind', 'Fire', 'Ice', 'Stone', 'Steel'
         ];
-        
+
         const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
         const number = Math.floor(Math.random() * 999) + 1;
-        
+
         return `${adjective}${noun}${number}`;
     }
 
-    // Generate consistent username based on player ID
     function generateUsernameFromPlayerId(playerId) {
         const adjectives = [
             'Swift', 'Clever', 'Bright', 'Quick', 'Sharp', 'Wise', 'Bold', 'Cool',
@@ -126,56 +116,48 @@ document.addEventListener('DOMContentLoaded', () => {
             'Dark', 'Soft', 'Deep', 'High', 'Rich', 'Warm', 'Cold', 'Loud',
             'Quiet', 'Strong', 'Light', 'Heavy', 'Smooth', 'Rough', 'Fresh', 'Sweet'
         ];
-        
+
         const nouns = [
             'Wizard', 'Phoenix', 'Dragon', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear',
             'Hawk', 'Lion', 'Shark', 'Falcon', 'Raven', 'Lynx', 'Panther', 'Viper',
             'Storm', 'Flame', 'Shadow', 'Blade', 'Arrow', 'Star', 'Moon', 'Sun',
             'Ocean', 'Thunder', 'Lightning', 'Wind', 'Fire', 'Ice', 'Stone', 'Steel'
         ];
-        
-        // Generate hash from player ID for consistency
+
         let hash = 0;
         for (let i = 0; i < playerId.length; i++) {
             hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
         }
-        
+
         const adjIndex = Math.abs(hash) % adjectives.length;
         const nounIndex = Math.abs(hash >> 8) % nouns.length;
         const number = (Math.abs(hash >> 16) % 999) + 1;
-        
+
         return `${adjectives[adjIndex]}${nouns[nounIndex]}${number}`;
     }
 
-    // Cache for generated usernames
     const usernameCache = {};
 
-    // Generate deterministic username for current player if not already set
     if (!playerUsername) {
         playerUsername = generateUsernameFromPlayerId(playerId);
         localStorage.setItem('playerUsername', playerUsername);
     }
 
-    // --- Avatar Generation ---
     function generateAvatar(playerId) {
-        // Use player ID to generate consistent values
         let hash = 0;
         for (let i = 0; i < playerId.length; i++) {
             hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
         }
-        
-        // Generate colors from hash
+
         const hue = Math.abs(hash) % 360;
         const backgroundColor = `hsl(${hue}, 70%, 80%)`;
         const accentColor = `hsl(${(hue + 180) % 360}, 60%, 50%)`;
-        
-        // Pick avatar style based on hash
         const styleIndex = Math.abs(hash) % 8;
-        
+
         let svg = '';
-        
+
         switch(styleIndex) {
-            case 0: // Robot
+            case 0:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -188,8 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 1: // Cat
+            case 1:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -204,8 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 2: // Alien
+            case 2:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -222,8 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 3: // Monster
+            case 3:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -237,8 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 4: // Bear
+            case 4:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -253,8 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 5: // Ghost
+            case 5:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -265,8 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 6: // Octopus
+            case 6:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -283,8 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 `;
                 break;
-            
-            case 7: // Wizard
+            case 7:
                 svg = `
                     <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="12" fill="${backgroundColor}"/>
@@ -299,13 +274,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 break;
         }
-        
+
         return 'data:image/svg+xml;base64,' + btoa(svg);
     }
-    
-    // Cache for avatars
+
     const avatarCache = {};
-    
+
     function getAvatar(playerId) {
         if (!avatarCache[playerId]) {
             avatarCache[playerId] = generateAvatar(playerId);
@@ -313,35 +287,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return avatarCache[playerId];
     }
 
-    // Extract background color for a player
     function getPlayerBackgroundColor(playerId) {
         let hash = 0;
         for (let i = 0; i < playerId.length; i++) {
             hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
         }
-        
+
         const hue = Math.abs(hash) % 360;
         return `hsl(${hue}, 70%, 80%)`;
     }
 
-    // --- Notification System ---
     function showWordFoundNotification(word, username, isCurrentPlayer = false, foundByPlayerId = null) {
-        
-        // Create notification element
         const notification = document.createElement('div');
         const wordsCounter = document.getElementById('words-counter');
         const puzzleInfo = document.getElementById('puzzle-info');
-        
-        // Alternate notification side
+
         const isRightSide = notificationSide === 'right';
         notificationSide = notificationSide === 'right' ? 'left' : 'right';
-        
+
         if (wordsCounter && puzzleInfo) {
             const sideProperty = isRightSide ? 'right' : 'left';
             const animationName = isRightSide ? 'slideInFromRight' : 'slideInFromLeft';
-            
             const bgColor = 'linear-gradient(135deg, #6a4c93 0%, #9d4edd 100%)';
-            
+
             notification.style.cssText = `
                 position: absolute;
                 top: 50%;
@@ -365,12 +333,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 backface-visibility: hidden;
                 border: 2px solid rgba(255, 255, 255, 0.4);
             `;
-            
-            // Insert into the puzzle info container
+
             puzzleInfo.style.position = 'relative';
             puzzleInfo.appendChild(notification);
         } else {
-            // Fallback positioning
             notification.style.cssText = `
                 position: fixed;
                 top: 20%;
@@ -393,16 +359,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 backface-visibility: hidden;
                 border: 2px solid rgba(255, 255, 255, 0.3);
             `;
-            
+
             document.body.appendChild(notification);
         }
-        
+
         const avatarSize = window.innerWidth < 480 ? '20px' : '24px';
         const avatarPlayerId = foundByPlayerId || playerId;
         const avatarSvg = generateAvatar(avatarPlayerId);
-        const avatarHtml = `<img src="${avatarSvg}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; margin-right: 8px; vertical-align: middle;">`;
         const displayName = isCurrentPlayer ? playerUsername : username;
-        
+
         const notifContainer = document.createElement('div');
         notifContainer.style.cssText = 'display:flex;align-items:center;justify-content:center;';
         const avatarImg = document.createElement('img');
@@ -419,80 +384,40 @@ document.addEventListener('DOMContentLoaded', () => {
         notifContainer.appendChild(avatarImg);
         notifContainer.appendChild(textDiv);
         notification.appendChild(notifContainer);
-        
-        // Add animation keyframes if not already added
+
         if (!document.getElementById('base-game-animations')) {
             const style = document.createElement('style');
             style.id = 'base-game-animations';
             style.textContent = `
                 @keyframes slideInFromRight {
-                    0% { 
-                        transform: translateX(100%) translateY(-50%) translateZ(0); 
-                        opacity: 0; 
-                    }
-                    100% { 
-                        transform: translateX(0) translateY(-50%) translateZ(0); 
-                        opacity: 1; 
-                    }
+                    0% { transform: translateX(100%) translateY(-50%) translateZ(0); opacity: 0; }
+                    100% { transform: translateX(0) translateY(-50%) translateZ(0); opacity: 1; }
                 }
                 @keyframes slideOutToRight {
-                    0% { 
-                        transform: translateX(0) translateY(-50%) translateZ(0); 
-                        opacity: 1; 
-                    }
-                    100% { 
-                        transform: translateX(100%) translateY(-50%) translateZ(0); 
-                        opacity: 0; 
-                    }
+                    0% { transform: translateX(0) translateY(-50%) translateZ(0); opacity: 1; }
+                    100% { transform: translateX(100%) translateY(-50%) translateZ(0); opacity: 0; }
                 }
                 @keyframes slideInFromLeft {
-                    0% { 
-                        transform: translateX(-100%) translateY(-50%) translateZ(0); 
-                        opacity: 0; 
-                    }
-                    100% { 
-                        transform: translateX(0) translateY(-50%) translateZ(0); 
-                        opacity: 1; 
-                    }
+                    0% { transform: translateX(-100%) translateY(-50%) translateZ(0); opacity: 0; }
+                    100% { transform: translateX(0) translateY(-50%) translateZ(0); opacity: 1; }
                 }
                 @keyframes slideOutToLeft {
-                    0% { 
-                        transform: translateX(0) translateY(-50%) translateZ(0); 
-                        opacity: 1; 
-                    }
-                    100% { 
-                        transform: translateX(-100%) translateY(-50%) translateZ(0); 
-                        opacity: 0; 
-                    }
+                    0% { transform: translateX(0) translateY(-50%) translateZ(0); opacity: 1; }
+                    100% { transform: translateX(-100%) translateY(-50%) translateZ(0); opacity: 0; }
                 }
                 @keyframes popIn {
-                    0% { 
-                        transform: translate(-50%, 0) scale(0.5) translateZ(0); 
-                        opacity: 0; 
-                    }
-                    50% { 
-                        transform: translate(-50%, 0) scale(1.1) translateZ(0); 
-                    }
-                    100% { 
-                        transform: translate(-50%, 0) scale(1) translateZ(0); 
-                        opacity: 1; 
-                    }
+                    0% { transform: translate(-50%, 0) scale(0.5) translateZ(0); opacity: 0; }
+                    50% { transform: translate(-50%, 0) scale(1.1) translateZ(0); }
+                    100% { transform: translate(-50%, 0) scale(1) translateZ(0); opacity: 1; }
                 }
                 @keyframes popOut {
-                    0% { 
-                        transform: translate(-50%, 0) scale(1) translateZ(0); 
-                        opacity: 1; 
-                    }
-                    100% { 
-                        transform: translate(-50%, 0) scale(0.8) translateZ(0); 
-                        opacity: 0; 
-                    }
+                    0% { transform: translate(-50%, 0) scale(1) translateZ(0); opacity: 1; }
+                    100% { transform: translate(-50%, 0) scale(0.8) translateZ(0); opacity: 0; }
                 }
             `;
             document.head.appendChild(style);
         }
-        
-        // Remove after 3 seconds
+
         setTimeout(() => {
             if (wordsCounter && puzzleInfo && notification.parentNode === puzzleInfo) {
                 const exitAnimation = isRightSide ? 'slideOutToRight' : 'slideOutToLeft';
@@ -500,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 notification.style.animation = 'popOut 0.3s ease-in';
             }
-            
+
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
@@ -509,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // --- WebSocket Connection ---
     let pendingGame = null;
     let reconnectDelay = 1000;
 
@@ -520,14 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
         socket = new WebSocket(wsUrl);
 
         socket.addEventListener('open', () => {
-            console.log('Connected to server');
             reconnectDelay = 1000;
             socket.send(JSON.stringify({ type: 'request_current_game' }));
         });
 
         socket.addEventListener('message', (event) => {
             const msg = JSON.parse(event.data);
-            console.log('[DEBUG] Received:', msg.type);
 
             if (msg.type === 'current_game') {
                 if (msg.data) loadGameSession(msg.data);
@@ -583,24 +505,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        socket.addEventListener('error', () => {
-            console.error('WebSocket error');
-        });
-
         socket.addEventListener('close', () => {
-            console.log('Disconnected from server');
             gridContainer.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Disconnected. Reconnecting...</p>';
             setTimeout(connectSocket, reconnectDelay);
             reconnectDelay = Math.min(reconnectDelay * 2, 30000);
         });
     }
 
-    // --- Game Setup ---
     async function setup() {
         try {
             const response = await fetch(`${SERVER_URL}/api/current-game`);
             const gameData = await response.json();
-            
+
             if (gameData && gameData.status === 'ACTIVE') {
                 loadGameSession(gameData);
             } else {
@@ -616,16 +532,14 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSession = gameData;
         originalWords = new Set();
         gridData = gameData.gridData;
-        
-        // Reset found words tracking
+
         allFoundWords.clear();
         foundOriginalWords.clear();
         bonusWordsFound = 0;
         bonusWordsArray = [];
         gameEmojiGrid = null;
         puzzleCompletionTime = null;
-        
-        // Process already found words
+
         if (gameData.foundWords) {
             gameData.foundWords.forEach(fw => {
                 allFoundWords.add(fw.word);
@@ -637,16 +551,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        
-        // Update UI
+
         puzzleTitle.textContent = gameData.category;
         renderGrid(gridData);
         updateWordsCounter();
         displayFoundWords(gameData.foundWords || []);
-        
-        // Start timer with proper date parsing
+
         const endTime = new Date(gameData.endTime);
-        console.log('Game ends at:', endTime.toLocaleString());
         startTimer(endTime);
     }
 
@@ -655,11 +566,10 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleTitle.textContent = 'Loading...';
     }
 
-    // --- Rendering ---
     function renderGrid(grid) {
         gridContainer.innerHTML = '';
         tileElements = [];
-        
+
         for (let r = 0; r < gridSize; r++) {
             const rowElements = [];
             for (let c = 0; c < gridSize; c++) {
@@ -689,28 +599,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayFoundWords(foundWords) {
-        console.log('DISPLAY WORDS DEBUG - Function called with', foundWords.length, 'words');
         foundWordsList.innerHTML = '';
         bonusWordsList.innerHTML = '';
-        
+
         foundWords.forEach(fw => {
             const li = document.createElement('li');
             const avatar = document.createElement('img');
             avatar.src = getAvatar(fw.foundBy);
             avatar.title = fw.foundBy === playerId ? 'You' : fw.foundBy;
-            
             avatar.className = 'player-avatar';
-            
-            // Create word span
+
             const wordSpan = document.createElement('span');
             wordSpan.textContent = fw.word;
-            
-            // Add both to li
+
             li.appendChild(avatar);
             li.appendChild(wordSpan);
             li.dataset.word = fw.word;
             li.dataset.foundBy = fw.foundBy;
-            
+
             if (fw.isBonus) {
                 bonusWordsList.appendChild(li);
             } else {
@@ -720,12 +626,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFoundWordsList(foundWords) {
-        // Clear and rebuild the lists
         allFoundWords.clear();
         foundOriginalWords.clear();
         bonusWordsFound = 0;
         bonusWordsArray = [];
-        
+
         foundWords.forEach(fw => {
             allFoundWords.add(fw.word);
             if (!fw.isBonus) {
@@ -735,13 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 bonusWordsArray.push(fw.word);
             }
         });
-        
+
         displayFoundWords(foundWords);
         updateWordsCounter();
-        checkForCompletion();
     }
 
-    // --- Word Processing ---
     function shakeInput() {
         wordInput.classList.remove('invalid');
         void wordInput.offsetWidth;
@@ -782,13 +685,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function findWordOnGrid(word) {
         const wordReversed = word.split('').reverse().join('');
-        
+
         for (let r = 0; r < gridSize; r++) {
             for (let c = 0; c < gridSize; c++) {
                 for (const dir of directions) {
                     let path = checkDirection(word, r, c, dir);
                     if (path) return path;
-                    
+
                     path = checkDirection(wordReversed, r, c, dir);
                     if (path) return path;
                 }
@@ -802,8 +705,8 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let k = 0; k < word.length; k++) {
             const newR = r + k * dir.x;
             const newC = c + k * dir.y;
-            
-            if (newR < 0 || newR >= gridSize || newC < 0 || newC >= gridSize || 
+
+            if (newR < 0 || newR >= gridSize || newC < 0 || newC >= gridSize ||
                 gridData[newR][newC] !== word[k]) {
                 return null;
             }
@@ -815,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function highlightPath(path, foundByPlayerId = null) {
         const actualPlayerId = foundByPlayerId || playerId;
         const playerColor = getPlayerBackgroundColor(actualPlayerId);
-        
+
         path.forEach(pos => {
             const tile = tileElements[pos.x][pos.y];
             tile.style.backgroundColor = playerColor;
@@ -832,30 +735,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     }
 
-    // --- Timer Management ---
     function startTimer(endTime) {
         if (timerInterval) clearInterval(timerInterval);
-        
+
         const updateTimer = () => {
             const now = new Date();
             const end = new Date(endTime);
             const timeLeft = Math.max(0, Math.floor((end - now) / 1000));
-            
+
             const minutes = Math.floor(timeLeft / 60);
             const seconds = timeLeft % 60;
             timeRemaining.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            
+
             if (timeLeft <= 0 && currentSession && currentSession.status === 'ACTIVE') {
                 clearInterval(timerInterval);
-                // Server will handle the timeout and emit 'game_timeout' event
             }
         };
-        
+
         updateTimer();
         timerInterval = setInterval(updateTimer, 1000);
     }
 
-    // --- UI Updates ---
     function updateWordsCounter() {
         foundCount.textContent = foundOriginalWords.size;
         totalCount.textContent = currentSession ? currentSession.totalWords : 0;
@@ -863,14 +763,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function checkForCompletion() {
-        // Completion is now handled by the server via socket events
-        // The server will emit 'puzzle_completed' when all words are found
+        // Handled by the server via 'puzzle_completed' WebSocket event
     }
 
     async function celebratePuzzleCompletion() {
         if (timerInterval) clearInterval(timerInterval);
-        
-        // Request current game state to get emoji grid
+
         try {
             const response = await fetch(`${SERVER_URL}/api/current-game`);
             const gameData = await response.json();
@@ -881,19 +779,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error fetching emoji grid:', error);
         }
 
-        // Calculate time taken
         const startTime = new Date(currentSession.startTime);
         const timeTaken = Date.now() - startTime.getTime();
         const minutesTaken = Math.floor(timeTaken / 60000);
         const secondsTaken = Math.floor((timeTaken % 60000) / 1000);
         const timeString = `${minutesTaken}:${secondsTaken.toString().padStart(2, '0')}`;
-        
-        // Store completion time for copy function
+
         puzzleCompletionTime = timeString;
-        
         document.getElementById('time-taken').textContent = timeString;
-        
-        // Show found words
+
         const celebrationFoundWords = document.getElementById('celebration-found-words');
         celebrationFoundWords.innerHTML = '';
         foundOriginalWords.forEach(word => {
@@ -902,8 +796,7 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = word;
             celebrationFoundWords.appendChild(span);
         });
-        
-        // Show bonus words
+
         document.getElementById('celebration-bonus-count').textContent = bonusWordsFound;
         const celebrationBonusWords = document.getElementById('celebration-bonus-words');
         celebrationBonusWords.innerHTML = '';
@@ -913,74 +806,38 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = word;
             celebrationBonusWords.appendChild(span);
         });
-        
-        // Display emoji grid if available
+
         if (gameEmojiGrid && celebrationEmojiGrid) {
             celebrationEmojiGrid.textContent = gameEmojiGrid;
         } else if (celebrationEmojiGrid) {
             celebrationEmojiGrid.textContent = 'Grid not available';
         }
-        
+
         celebrationOverlay.classList.remove('hidden');
-        
-        // FIXED: Always use 10 seconds for early completion
+
         let countdown = 10;
         countdownElement.textContent = countdown;
-        
+
         const countdownInterval = setInterval(() => {
             countdown--;
             countdownElement.textContent = countdown;
-            
+
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
                 celebrationOverlay.classList.add('hidden');
-                
-                // Load pending game if there is one
-                if (pendingGame) {
-                    loadGameSession(pendingGame);
-                    pendingGame = null;
-                } else {
-                    // Poll for new game multiple times
-                    console.log('[DEBUG] No pending game after celebration, starting poll for new game');
-                    let pollAttempts = 0;
-                    const pollInterval = setInterval(async () => {
-                        pollAttempts++;
-                        console.log(`[DEBUG] Polling for new game, attempt ${pollAttempts}`);
-                        
-                        try {
-                            const response = await fetch(`${SERVER_URL}/api/current-game`);
-                            const gameData = await response.json();
-                            
-                            if (gameData && gameData.status === 'ACTIVE') {
-                                console.log('[DEBUG] New game found via polling!');
-                                clearInterval(pollInterval);
-                                loadGameSession(gameData);
-                            } else if (pollAttempts >= 10) {
-                                console.log('[DEBUG] Max poll attempts reached');
-                                clearInterval(pollInterval);
-                                showWaitingScreen();
-                            }
-                        } catch (error) {
-                            console.error('Poll error:', error);
-                        }
-                    }, 500); // Poll every 500ms
-                }
+                loadPendingOrPoll();
             }
         }, 1000);
     }
 
     function showSummaryScreen() {
         if (!currentSession) return;
-        
-        // Stop the timer
         if (timerInterval) clearInterval(timerInterval);
-        
-        // Populate summary
+
         document.getElementById('summary-found').textContent = foundOriginalWords.size;
         document.getElementById('summary-total').textContent = currentSession ? currentSession.totalWords : 0;
         document.getElementById('summary-bonus').textContent = bonusWordsFound;
-        
-        // Show missed words
+
         const missedWords = document.getElementById('missed-words');
         missedWords.innerHTML = '';
         if (currentSession && currentSession.missedWords) {
@@ -991,8 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 missedWords.appendChild(span);
             });
         }
-        
-        // Show found words
+
         const foundWordsSummary = document.getElementById('found-words-summary');
         foundWordsSummary.innerHTML = '';
         foundOriginalWords.forEach(word => {
@@ -1001,8 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = word;
             foundWordsSummary.appendChild(span);
         });
-        
-        // Show bonus words
+
         const bonusWordsSummary = document.getElementById('bonus-words-summary');
         bonusWordsSummary.innerHTML = '';
         bonusWordsArray.forEach(word => {
@@ -1011,63 +866,56 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = word;
             bonusWordsSummary.appendChild(span);
         });
-        
-        // Display emoji grid if available
+
         if (gameEmojiGrid && summaryEmojiGrid) {
             summaryEmojiGrid.textContent = gameEmojiGrid;
         } else if (summaryEmojiGrid) {
             summaryEmojiGrid.textContent = 'Grid not available';
         }
-        
+
         summaryOverlay.classList.remove('hidden');
-        
-        // Countdown to next game
+
         let countdown = 10;
         summaryCountdown.textContent = countdown;
-        
+
         const countdownInterval = setInterval(() => {
             countdown--;
             summaryCountdown.textContent = countdown;
-            
+
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
                 summaryOverlay.classList.add('hidden');
-                
-                // Load pending game if there is one
-                if (pendingGame) {
-                    loadGameSession(pendingGame);
-                    pendingGame = null;
-                } else {
-                    // Poll for new game multiple times
-                    console.log('[DEBUG] No pending game after celebration, starting poll for new game');
-                    let pollAttempts = 0;
-                    const pollInterval = setInterval(async () => {
-                        pollAttempts++;
-                        console.log(`[DEBUG] Polling for new game, attempt ${pollAttempts}`);
-                        
-                        try {
-                            const response = await fetch(`${SERVER_URL}/api/current-game`);
-                            const gameData = await response.json();
-                            
-                            if (gameData && gameData.status === 'ACTIVE') {
-                                console.log('[DEBUG] New game found via polling!');
-                                clearInterval(pollInterval);
-                                loadGameSession(gameData);
-                            } else if (pollAttempts >= 10) {
-                                console.log('[DEBUG] Max poll attempts reached');
-                                clearInterval(pollInterval);
-                                showWaitingScreen();
-                            }
-                        } catch (error) {
-                            console.error('Poll error:', error);
-                        }
-                    }, 500); // Poll every 500ms
-                }
+                loadPendingOrPoll();
             }
         }, 1000);
     }
 
-    // --- Event Listeners ---
+    function loadPendingOrPoll() {
+        if (pendingGame) {
+            loadGameSession(pendingGame);
+            pendingGame = null;
+        } else {
+            let pollAttempts = 0;
+            const pollInterval = setInterval(async () => {
+                pollAttempts++;
+                try {
+                    const response = await fetch(`${SERVER_URL}/api/current-game`);
+                    const gameData = await response.json();
+
+                    if (gameData && gameData.status === 'ACTIVE') {
+                        clearInterval(pollInterval);
+                        loadGameSession(gameData);
+                    } else if (pollAttempts >= 10) {
+                        clearInterval(pollInterval);
+                        showWaitingScreen();
+                    }
+                } catch (error) {
+                    console.error('Poll error:', error);
+                }
+            }, 500);
+        }
+    }
+
     wordInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
             processGuess(wordInput.value);
@@ -1076,20 +924,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     wordInput.focus();
 
-    // --- Copy Button Functionality ---
+    if (window.visualViewport && window.matchMedia('(max-width: 768px)').matches) {
+        let lastHeight = window.visualViewport.height;
+        window.visualViewport.addEventListener('resize', () => {
+            const vv = window.visualViewport;
+            if (vv.height < lastHeight) {
+                gridContainer.scrollIntoView({ block: 'start', behavior: 'instant' });
+            }
+            lastHeight = vv.height;
+        });
+    }
+
     function setupCopyButton(button, getTextFunc) {
-        if (!button) return; // Skip if button doesn't exist
-        
+        if (!button) return;
+
         button.addEventListener('click', async () => {
             try {
                 const textToCopy = getTextFunc();
                 await navigator.clipboard.writeText(textToCopy);
-                
-                // Show success feedback
+
                 button.classList.add('copied');
                 const originalText = button.textContent;
                 button.textContent = 'Copied!';
-                
+
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.textContent = originalText;
@@ -1099,23 +956,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
-    // Setup copy buttons
+
     setupCopyButton(copyCelebrationBtn, () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
         const timeText = puzzleCompletionTime ? `\nCompleted in: ${puzzleCompletionTime}` : '';
         return `For You Puzzles - ${category}${timeText}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
-    
+
     setupCopyButton(copySummaryBtn, () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
-        // No completion time for summary (timeout case)
         return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
 
-    // --- Initialize ---
     connectSocket();
     setup();
 });

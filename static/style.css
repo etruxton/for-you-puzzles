@@ -481,7 +481,7 @@ h1, h2 {
         flex-direction: column;
         align-items: center;
     }
-    
+
     #grid-container {
         padding: 6px;
         gap: 3px;
@@ -489,7 +489,7 @@ h1, h2 {
         margin: 0 auto;
         max-width: calc(100vw - 20px);
     }
-    
+
     .grid-tile {
         width: calc((100vw - 60px) / 10);
         height: calc((100vw - 60px) / 10);
@@ -499,7 +499,7 @@ h1, h2 {
         min-height: 24px;
         font-size: 16px;
     }
-    
+
     #grid-and-input {
         order: -1;
         width: 100%;
