@@ -961,13 +961,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
         const timeText = puzzleCompletionTime ? `\nCompleted in: ${puzzleCompletionTime}` : '';
-        return `For You Puzzles - ${category}${timeText}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
+        return `word.erica.rocks - ${category}${timeText}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
 
     setupCopyButton(copySummaryBtn, () => {
         const category = currentSession ? currentSession.category : 'Word Search';
         const emojiGrid = gameEmojiGrid || 'No grid available';
-        return `For You Puzzles - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
+        return `word.erica.rocks - ${category}\n\n${emojiGrid}\n\nPlay at: ${window.location.origin}`;
     });
 
     connectSocket();

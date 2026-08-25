@@ -1,8 +1,8 @@
-# For You Puzzles
+# word.erica.rocks
 
 A multiplayer word search game. Everyone on the site plays the same puzzle at the same time.
 
-Live at [foryoupuzzles.com](https://foryoupuzzles.com).
+Live at [word.erica.rocks](https://word.erica.rocks).
 
 ## How it works
 
