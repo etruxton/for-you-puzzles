@@ -1,4 +1,4 @@
-# Online Multiplayer Word Search Game
+# Real-time Word Search
 
 A multiplayer word search game. Everyone on the site plays the same puzzle at the same time.
 
